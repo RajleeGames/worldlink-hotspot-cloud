@@ -91,7 +91,11 @@ class _NoRedirect(HTTPRedirectHandler):
 def _request(method, path, payload=None, token=None, signed=False, idem_key=None):
     ensure_settings_ready()
     raw = b'' if payload is None else json.dumps(payload, separators=(',', ':'), ensure_ascii=False).encode('utf-8')
-    headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
+    headers = {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    'User-Agent': 'curl/8.5.0',
+}
     if token:
         headers['Authorization'] = 'Bearer ' + token
     if signed:
