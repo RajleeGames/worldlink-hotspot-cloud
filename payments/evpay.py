@@ -16,6 +16,11 @@ from urllib.request import Request, build_opener, HTTPRedirectHandler
 from django.conf import settings
 from django.core.cache import cache
 
+import socket
+import ssl
+from http.client import HTTPSConnection
+from urllib.request import HTTPSHandler, ProxyHandler
+
 
 class EvPayError(RuntimeError):
     pass
@@ -88,37 +93,144 @@ class _NoRedirect(HTTPRedirectHandler):
         return None
 
 
+class _EvPayIPv4Connection(HTTPSConnection):
+    """IPv4-only HTTPS connection, with normal TLS verification."""
+
+    def connect(self):
+        addresses = socket.getaddrinfo(
+            self.host,
+            self.port,
+            socket.AF_INET,
+            socket.SOCK_STREAM,
+        )
+
+        if not addresses:
+            raise OSError("EvPay has no reachable IPv4 address")
+
+        last_error = None
+
+        for _, _, _, _, address in addresses:
+            sock = None
+
+            try:
+                sock = socket.create_connection(
+                    (address[0], self.port),
+                    timeout=self.timeout,
+                    source_address=self.source_address,
+                )
+
+                self.sock = self._context.wrap_socket(
+                    sock,
+                    server_hostname=self.host,
+                )
+                return
+
+            except OSError as exc:
+                last_error = exc
+                if sock is not None:
+                    sock.close()
+
+        raise last_error or OSError("EvPay IPv4 connection failed")
+
+
+class _EvPayIPv4Handler(HTTPSHandler):
+    def https_open(self, req):
+        return self.do_open(
+            _EvPayIPv4Connection,
+            req,
+            context=self._context,
+            check_hostname=self._check_hostname,
+        )
 def _request(method, path, payload=None, token=None, signed=False, idem_key=None):
     ensure_settings_ready()
-    raw = b'' if payload is None else json.dumps(payload, separators=(',', ':'), ensure_ascii=False).encode('utf-8')
+
+    raw = (
+        b''
+        if payload is None
+        else json.dumps(
+            payload,
+            separators=(',', ':'),
+            ensure_ascii=False,
+        ).encode('utf-8')
+    )
+
     headers = {
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
-    'User-Agent': 'curl/8.5.0',
-}
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'curl/8.5.0',
+    }
+
     if token:
         headers['Authorization'] = 'Bearer ' + token
+
     if signed:
         timestamp = str(int(time.time() * 1000))
+
         headers['X-Timestamp'] = timestamp
-        headers['X-Signature'] = sign_payload(settings.EVPAY_SIG_KEY, timestamp, raw)
+        headers['X-Signature'] = sign_payload(
+            settings.EVPAY_SIG_KEY,
+            timestamp,
+            raw,
+        )
+
     if idem_key:
         headers['Idempotency-Key'] = idem_key
-    url = settings.EVPAY_BASE_URL.rstrip('/') + path
-    req = Request(url, data=raw if method == 'POST' else None, headers=headers, method=method)
-    try:
-        with build_opener(_NoRedirect).open(req, timeout=12) as response:
-            result = json.loads(response.read(250000).decode('utf-8'))
-    except HTTPError as exc:
-        raise EvPayError(f'EvPay returned HTTP {exc.code}. Check merchant access, request fields or credentials.') from None
-    except (URLError, TimeoutError) as exc:
-        raise EvPayError('EvPay is unreachable or timed out. Do NOT retry the charge automatically; reconcile using the original request reference.') from None
-    except (ValueError, UnicodeDecodeError):
-        raise EvPayError('EvPay returned an invalid JSON response.') from None
-    if not isinstance(result, dict) or result.get('success') is not True or not isinstance(result.get('data'), dict):
-        raise EvPayError('EvPay rejected the request. Check enabled collections and API configuration.')
-    return result['data']
 
+    url = settings.EVPAY_BASE_URL.rstrip('/') + path
+
+    req = Request(
+        url,
+        data=raw if method == 'POST' else None,
+        headers=headers,
+        method=method,
+    )
+
+    # Force IPv4 for EvPay only.
+    # Do not disable TLS verification.
+    # Do not follow redirects with merchant credentials.
+    opener = build_opener(
+        ProxyHandler({}),
+        _EvPayIPv4Handler(
+            context=ssl.create_default_context()
+        ),
+        _NoRedirect(),
+    )
+
+    try:
+        with opener.open(req, timeout=20) as response:
+            result = json.loads(
+                response.read(250000).decode('utf-8')
+            )
+
+    except HTTPError as exc:
+        raise EvPayError(
+            f'EvPay returned HTTP {exc.code}. '
+            'Check merchant access or provider restrictions.'
+        ) from None
+
+    except (URLError, TimeoutError, OSError):
+        raise EvPayError(
+            'EvPay is unreachable or timed out. '
+            'Do not automatically retry a payment charge; '
+            'reconcile its original reference.'
+        ) from None
+
+    except (ValueError, UnicodeDecodeError):
+        raise EvPayError(
+            'EvPay returned an invalid JSON response.'
+        ) from None
+
+    if (
+        not isinstance(result, dict)
+        or result.get('success') is not True
+        or not isinstance(result.get('data'), dict)
+    ):
+        raise EvPayError(
+            'EvPay rejected the request. '
+            'Check the merchant configuration.'
+        )
+
+    return result['data']
 
 def access_token():
     ensure_settings_ready()
