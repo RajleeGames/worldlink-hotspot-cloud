@@ -1,0 +1,7 @@
+{% extends 'auth/base_auth.html' %}{% load translations %}{% block title %}Welcome{% endblock %}{% block auth_content %}
+<div class="auth-intro"><span class="eyebrow">WORLDLINK SECURITY SYSTEMS</span><h1>{% t 'Your internet business, under control.' %}</h1><p>{% t 'Multi-business hotspot and voucher management platform.' %}</p></div>
+<div class="landing-points"><div><strong>01</strong> {% t 'Network management' %}</div><div><strong>02</strong> {% t 'Voucher operations' %}</div><div><strong>03</strong> {% t 'Sales reports' %}</div></div>
+<a href="{% url 'login' %}" class="button button-primary button-full">{% t 'Sign in' %} →</a>
+{% if allow_signup %}<a href="{% url 'register' %}" class="button button-secondary button-full">{% t 'Create an account' %}</a>{% endif %}
+<p class="tiny-disclaimer">{% t 'This is a starter platform; payments and live RADIUS/Omada authentication require the next integration phase.' %}</p>
+{% endblock %}

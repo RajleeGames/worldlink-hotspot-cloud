@@ -1,0 +1,120 @@
+{% load static translations %}
+<!doctype html>
+<html lang="{{ ui_lang }}" data-theme="light" data-sidebar="full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>{{ page_title|default:'Dashboard' }} · {{ platform_brand.product_name|default:'WorldLink Hotspot Cloud' }}</title>
+  {% include 'partials/favicon.html' %}
+  <script>try{document.documentElement.dataset.theme=localStorage.getItem('whc-theme')||'light';document.documentElement.dataset.sidebar=localStorage.getItem('whc-sidebar')||'full'}catch(e){};document.documentElement.classList.add('whc-js');setTimeout(()=>document.getElementById('whcPreloader')?.classList.add('is-hidden'),2200);</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=7">
+  <script defer src="{% static 'js/app.js' %}?v=7"></script>
+</head>
+<body class="app-body">
+{% include 'partials/preloader.html' %}
+<a href="#main-content" class="skip-link">Skip to content</a>
+{% include 'partials/shell_icons.html' %}
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+    <div class="sidebar-inner" id="sidebarScroll">
+      <a href="{% url 'cloud:dashboard' %}" class="brand" title="WorldLink Hotspot Cloud">
+        <span class="brand-mark">{% include 'partials/brand_icon.html' %}</span>
+        <span class="brand-words"><strong>{{ platform_brand.product_name|default:'WorldLink Hotspot Cloud' }}</strong><small>{{ platform_brand.name|default:'WORLDLINK SECURITY SYSTEMS' }}</small></span>
+      </a>
+      <div class="workspace-chip" title="{% if request.resolver_match.namespace == 'controlcenter' %}WORLDLINK SECURITY SYSTEMS{% else %}{{ active_company.name|default:'WorldLink Platform' }}{% endif %}">
+        <span class="workspace-icon">{% if request.resolver_match.namespace == 'controlcenter' %}{% include 'partials/brand_icon.html' %}{% elif active_company.logo %}<img class="business-image" src="{{ active_company.logo.url }}" alt="">{% else %}{{ active_company.name|default:'W'|first|upper }}{% endif %}</span>
+        <span class="workspace-copy"><strong>{% if request.resolver_match.namespace == 'controlcenter' %}WorldLink Platform{% else %}{{ active_company.name|default:'WorldLink Platform' }}{% endif %}</strong><small>{% if request.resolver_match.namespace == 'controlcenter' %}{{ platform_role_label }}{% else %}{{ active_membership.get_role_display|default:'Administration' }}{% endif %}</small></span>
+        {% if active_membership %}<a class="workspace-switch" href="{% url 'tenants:switch' %}" title="{% t 'Switch business' %}" aria-label="{% t 'Switch business' %}"><svg class="icon"><use href="#ico-switch"></use></svg></a>{% endif %}
+      </div>
+      <nav class="nav" aria-label="Main sections">
+        {% if request.resolver_match.namespace == 'controlcenter' and can_view_platform %}
+        <span class="nav-heading">WORLDLINK · OPERATIONS</span>
+        <a href="{% url 'controlcenter:overview' %}" class="nav-link {% if request.resolver_match.url_name == 'overview' %}active{% endif %}"><svg class="icon"><use href="#ico-grid"></use></svg><span>{% t 'Control Center' %}</span></a>
+        <a href="{% url 'controlcenter:businesses' %}" class="nav-link {% if request.resolver_match.url_name == 'businesses' or request.resolver_match.url_name == 'business_detail' %}active{% endif %}"><svg class="icon"><use href="#ico-router"></use></svg><span>{% t 'All businesses' %}</span></a>
+        <a href="{% url 'controlcenter:users' %}" class="nav-link {% if request.resolver_match.url_name == 'users' or request.resolver_match.url_name == 'user_detail' %}active{% endif %}"><svg class="icon"><use href="#ico-user"></use></svg><span>{% t 'All user accounts' %}</span></a>
+        <a href="{% url 'controlcenter:platform_customers' %}" class="nav-link {% if request.resolver_match.url_name == 'platform_customers' %}active{% endif %}"><svg class="icon"><use href="#ico-user"></use></svg><span>{% t 'Hotspot customers' %}</span></a>
+        <a href="{% url 'controlcenter:platform_sessions' %}" class="nav-link {% if request.resolver_match.url_name == 'platform_sessions' %}active{% endif %}"><svg class="icon"><use href="#ico-chart"></use></svg><span>{% t 'Platform sessions' %}</span></a>
+        <a href="{% url 'controlcenter:platform_payments' %}" class="nav-link {% if request.resolver_match.url_name == 'platform_payments' %}active{% endif %}"><svg class="icon"><use href="#ico-wallet"></use></svg><span>Platform payments</span></a>
+        <a href="{% url 'controlcenter:team' %}" class="nav-link {% if request.resolver_match.url_name == 'team' or request.resolver_match.url_name == 'staff_detail' or request.resolver_match.url_name == 'staff_invite' or request.resolver_match.url_name == 'invitation_created' %}active{% endif %}"><svg class="icon"><use href="#ico-shield"></use></svg><span>{% t 'WorldLink team' %}</span></a>
+        <a href="{% url 'controlcenter:branding' %}" class="nav-link {% if request.resolver_match.url_name == 'branding' %}active{% endif %}"><svg class="icon"><use href="#ico-settings"></use></svg><span>{% t 'Platform branding' %}</span></a>
+        <a href="{% url 'controlcenter:audit' %}" class="nav-link {% if request.resolver_match.url_name == 'audit' %}active{% endif %}"><svg class="icon"><use href="#ico-shield"></use></svg><span>{% t 'Audit trail' %}</span></a>
+        {% if active_membership %}<a class="nav-link" href="{% url 'cloud:dashboard' %}"><svg class="icon"><use href="#ico-switch"></use></svg><span>{% t 'Business workspace' %}</span></a>{% endif %}
+        {% else %}
+        {% if can_view_platform %}<span class="nav-heading">WORLDLINK</span><a href="{% url 'controlcenter:overview' %}" class="nav-link"><svg class="icon"><use href="#ico-shield"></use></svg><span>{% t 'Control Center' %}</span></a>{% endif %}
+        <span class="nav-heading">{% t 'Overview' %}</span>
+        <a href="{% url 'cloud:dashboard' %}" title="{% t 'Dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" {% if request.resolver_match.url_name == 'dashboard' %}aria-current="page"{% endif %}><svg class="icon"><use href="#ico-grid"></use></svg><span>{% t 'Dashboard' %}</span></a>
+
+        <div class="nav-group {% if request.resolver_match.namespace == 'networks' or request.resolver_match.namespace == 'hotspots' %}is-current{% endif %}" data-nav-group="network" data-expanded="{% if request.resolver_match.namespace == 'networks' or request.resolver_match.namespace == 'hotspots' %}true{% else %}false{% endif %}">
+          <button type="button" class="nav-group-toggle" data-group-toggle aria-expanded="{% if request.resolver_match.namespace == 'networks' or request.resolver_match.namespace == 'hotspots' %}true{% else %}false{% endif %}" title="{% t 'Network' %}">
+            <svg class="icon"><use href="#ico-router"></use></svg><span>{% t 'Network' %}</span><svg class="icon nav-chevron"><use href="#ico-chevron"></use></svg>
+          </button>
+          <div class="nav-panel"><div class="nav-panel-inner">
+            <a href="{% url 'hotspots:sessions' %}" title="{% t 'Connected users' %}" class="nav-link {% if request.resolver_match.namespace == 'hotspots' and request.resolver_match.url_name == 'sessions' or request.resolver_match.url_name == 'session_detail' %}active{% endif %}"><svg class="icon"><use href="#ico-user"></use></svg><span>{% t 'Connected users' %}</span></a>
+            <a href="{% url 'hotspots:customers' %}" title="{% t 'Wi-Fi customers' %}" class="nav-link {% if request.resolver_match.url_name == 'customers' or request.resolver_match.url_name == 'customer_detail' or request.resolver_match.url_name == 'customer_new' or request.resolver_match.url_name == 'customer_edit' %}active{% endif %}"><svg class="icon"><use href="#ico-user"></use></svg><span>{% t 'Wi-Fi customers' %}</span></a>
+            <a href="{% url 'networks:routers' %}" title="{% t 'Routers' %}" class="nav-link {% if request.resolver_match.url_name == 'routers' or request.resolver_match.url_name == 'router_new' or request.resolver_match.url_name == 'router_edit' %}active{% endif %}"><svg class="icon"><use href="#ico-router"></use></svg><span>{% t 'Routers' %}</span></a>
+            <a href="{% url 'networks:locations' %}" title="{% t 'Locations' %}" class="nav-link {% if request.resolver_match.url_name == 'locations' or request.resolver_match.url_name == 'location_new' or request.resolver_match.url_name == 'location_edit' %}active{% endif %}"><svg class="icon"><use href="#ico-pin"></use></svg><span>{% t 'Locations' %}</span></a>
+            <a href="{% url 'networks:plans' %}" title="{% t 'Wi-Fi packages' %}" class="nav-link {% if request.resolver_match.url_name == 'plans' or request.resolver_match.url_name == 'plan_new' or request.resolver_match.url_name == 'plan_edit' %}active{% endif %}"><svg class="icon"><use href="#ico-box"></use></svg><span>{% t 'Wi-Fi packages' %}</span></a>
+          </div></div>
+        </div>
+
+        <div class="nav-group {% if request.resolver_match.namespace == 'vouchers' or request.resolver_match.namespace == 'payments' or request.resolver_match.url_name == 'reports' or request.resolver_match.url_name == 'expenses' or request.resolver_match.url_name == 'expense_new' or request.resolver_match.url_name == 'expense_edit' %}is-current{% endif %}" data-nav-group="sales" data-expanded="{% if request.resolver_match.namespace == 'vouchers' or request.resolver_match.namespace == 'payments' or request.resolver_match.url_name == 'reports' or request.resolver_match.url_name == 'expenses' or request.resolver_match.url_name == 'expense_new' or request.resolver_match.url_name == 'expense_edit' %}true{% else %}false{% endif %}">
+          <button type="button" class="nav-group-toggle" data-group-toggle aria-expanded="{% if request.resolver_match.namespace == 'vouchers' or request.resolver_match.namespace == 'payments' or request.resolver_match.url_name == 'reports' or request.resolver_match.url_name == 'expenses' or request.resolver_match.url_name == 'expense_new' or request.resolver_match.url_name == 'expense_edit' %}true{% else %}false{% endif %}" title="{% t 'Sales' %}">
+            <svg class="icon"><use href="#ico-chart"></use></svg><span>{% t 'Sales' %}</span><svg class="icon nav-chevron"><use href="#ico-chevron"></use></svg>
+          </button>
+          <div class="nav-panel"><div class="nav-panel-inner">
+            <a href="{% url 'payments:orders' %}" title="Payment requests" class="nav-link {% if request.resolver_match.namespace == 'payments' and request.resolver_match.url_name != 'methods' and request.resolver_match.url_name != 'method_create' and request.resolver_match.url_name != 'method_edit' %}active{% endif %}"><svg class="icon"><use href="#ico-wallet"></use></svg><span>{% t 'Payment requests' %}</span></a>
+            <a href="{% url 'vouchers:batches' %}" title="{% t 'Voucher batches' %}" class="nav-link {% if request.resolver_match.namespace == 'vouchers' %}active{% endif %}"><svg class="icon"><use href="#ico-ticket"></use></svg><span>{% t 'Voucher batches' %}</span></a>
+            <a href="{% url 'cloud:reports' %}" title="{% t 'Sales reports' %}" class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}"><svg class="icon"><use href="#ico-chart"></use></svg><span>{% t 'Sales reports' %}</span></a>
+            <a href="{% url 'cloud:expenses' %}" title="{% t 'Expenses' %}" class="nav-link {% if request.resolver_match.url_name == 'expenses' or request.resolver_match.url_name == 'expense_new' or request.resolver_match.url_name == 'expense_edit' %}active{% endif %}"><svg class="icon"><use href="#ico-wallet"></use></svg><span>{% t 'Expenses' %}</span></a>
+          </div></div>
+        </div>
+
+        <div class="nav-group {% if request.resolver_match.namespace == 'tenants' or request.resolver_match.namespace == 'portal' or request.resolver_match.url_name == 'methods' or request.resolver_match.url_name == 'method_create' or request.resolver_match.url_name == 'method_edit' or request.resolver_match.url_name == 'profile' %}is-current{% endif %}" data-nav-group="account" data-expanded="{% if request.resolver_match.namespace == 'tenants' or request.resolver_match.namespace == 'portal' or request.resolver_match.url_name == 'methods' or request.resolver_match.url_name == 'method_create' or request.resolver_match.url_name == 'method_edit' or request.resolver_match.url_name == 'profile' %}true{% else %}false{% endif %}">
+          <button type="button" class="nav-group-toggle" data-group-toggle aria-expanded="{% if request.resolver_match.namespace == 'tenants' or request.resolver_match.namespace == 'portal' or request.resolver_match.url_name == 'methods' or request.resolver_match.url_name == 'method_create' or request.resolver_match.url_name == 'method_edit' or request.resolver_match.url_name == 'profile' %}true{% else %}false{% endif %}" title="{% t 'Administration' %}">
+            <svg class="icon"><use href="#ico-settings"></use></svg><span>{% t 'Administration' %}</span><svg class="icon nav-chevron"><use href="#ico-chevron"></use></svg>
+          </button>
+          <div class="nav-panel"><div class="nav-panel-inner">
+            {% if active_membership.role == 'OWNER' or active_membership.role == 'MANAGER' %}<a href="{% url 'portal:settings' %}" title="Captive portal" class="nav-link {% if request.resolver_match.namespace == 'portal' %}active{% endif %}"><svg class="icon"><use href="#ico-router"></use></svg><span>{% t 'Captive portal' %}</span></a>{% if evpay_pilot_available %}<a href="{% url 'payments:evpay_lab' %}" title="EvPay test lab" class="nav-link {% if request.resolver_match.url_name == 'evpay_lab' %}active{% endif %}"><svg class="icon"><use href="#ico-wallet"></use></svg><span>EvPay test lab</span></a>{% endif %}<a href="{% url 'payments:methods' %}" title="Payment methods" class="nav-link {% if request.resolver_match.url_name == 'methods' or request.resolver_match.url_name == 'method_create' or request.resolver_match.url_name == 'method_edit' %}active{% endif %}"><svg class="icon"><use href="#ico-wallet"></use></svg><span>{% t 'Payment methods' %}</span></a>{% endif %}
+            {% if active_membership.role == 'OWNER' or active_membership.role == 'MANAGER' %}<a href="{% url 'tenants:settings' %}" title="{% t 'Business settings' %}" class="nav-link {% if request.resolver_match.namespace == 'tenants' and request.resolver_match.url_name == 'settings' %}active{% endif %}"><svg class="icon"><use href="#ico-settings"></use></svg><span>{% t 'Business settings' %}</span></a>{% endif %}
+            <a href="{% url 'cloud:profile' %}" title="{% t 'My profile' %}" class="nav-link {% if request.resolver_match.url_name == 'profile' %}active{% endif %}"><svg class="icon"><use href="#ico-user"></use></svg><span>{% t 'My profile' %}</span></a>
+            {% if user.is_superuser %}<a href="{% url 'admin:cloud_platformbranding_changelist' %}" title="{% t 'Platform branding' %}" class="nav-link"><svg class="icon"><use href="#ico-shield"></use></svg><span>{% t 'Platform branding' %}</span></a>{% endif %}
+          </div></div>
+        </div>
+        {% endif %}
+      </nav>
+      <div class="sidebar-bottom"><span class="avatar avatar-sidebar">{{ user.first_name|default:user.username|first|upper }}</span><span class="sidebar-user"><strong>{{ user.get_full_name|default:user.username }}</strong><small>{% if request.resolver_match.namespace == 'controlcenter' %}{{ platform_role_label }}{% else %}{{ active_membership.get_role_display|default:'Platform admin' }}{% endif %}</small></span></div>
+    </div>
+  </aside>
+  <button class="backdrop" type="button" data-close-sidebar aria-label="Close navigation"></button>
+  <div class="main-area">
+    <header class="topbar">
+      <div class="top-left">
+        <button type="button" class="icon-button sidebar-toggle" data-sidebar-toggle aria-label="{% t 'Toggle sidebar' %}" title="{% t 'Toggle sidebar' %}"><svg class="icon"><use href="#ico-menu"></use></svg></button>
+        <nav class="breadcrumbs" aria-label="Breadcrumb">
+          {% for crumb in breadcrumbs %}
+            {% if not forloop.first %}<svg class="icon crumb-separator"><use href="#ico-chevron"></use></svg>{% endif %}
+            {% if crumb.url %}<a href="{{ crumb.url }}">{% t crumb.label %}</a>{% else %}<span {% if forloop.last %}aria-current="page"{% endif %}>{% t crumb.label %}</span>{% endif %}
+          {% endfor %}
+        </nav>
+      </div>
+      <div class="top-actions">
+        <form method="post" action="{% url 'language_change' %}" class="language-form">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><select name="language" class="language-select" aria-label="Language" onchange="this.form.submit()"><option value="en" {% if ui_lang == 'en' %}selected{% endif %}>EN</option><option value="sw" {% if ui_lang == 'sw' %}selected{% endif %}>SW</option></select></form>
+        <button class="icon-button theme-toggle" data-theme-toggle type="button" aria-label="{% t 'Switch theme' %}"><svg class="icon"><use href="#ico-moon"></use></svg></button>
+        <span class="topbar-avatar" title="{{ user.username }}">{{ user.first_name|default:user.username|first|upper }}</span>
+        <form method="post" action="{% url 'logout' %}" class="logout-form">{% csrf_token %}<button type="submit" class="icon-button" title="{% t 'Sign out' %}" aria-label="{% t 'Sign out' %}"><svg class="icon"><use href="#ico-logout"></use></svg></button></form>
+      </div>
+    </header>
+    <main class="content" id="main-content">
+      {% if messages %}<div class="flash-stack">{% for message in messages %}<div class="flash {{ message.tags }}" role="status">{{ message }}<button class="flash-dismiss" type="button" data-dismiss aria-label="Close">×</button></div>{% endfor %}</div>{% endif %}
+      <div class="integration-notice"><span class="notice-dot"></span><span>{% t 'Real router activation is not yet connected. Vouchers here are inventory records, not working internet credentials.' %}</span></div>
+      {% block content %}{% endblock %}
+      <footer class="footer"><span>© 2026 {{ platform_brand.name|default:'WORLDLINK SECURITY SYSTEMS' }}</span><span>WorldLink Hotspot Cloud · v0.7</span></footer>
+    </main>
+  </div>
+</div>
+</body>
+</html>

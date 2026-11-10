@@ -1,0 +1,15 @@
+{% extends 'auth/base_auth.html' %}{% load translations %}
+{% block title %}{% t 'Set your password' %}{% endblock %}
+{% block auth_content %}
+<div class="auth-intro"><span class="eyebrow">{% if portal_type == 'staff' %}WORLDLINK TEAM{% else %}BUSINESS WORKSPACE{% endif %}</span>
+  <h1>{% t 'Activate your account' %}</h1><p>{% t 'Create a secure password to finish setting up your account.' %}</p>
+</div>
+<div class="console-invite-profile"><span class="avatar avatar-sidebar">{{ invitation.user.first_name|first|upper }}</span><span><strong>{{ invitation.user.get_full_name|default:invitation.user.username }}</strong><small>{{ invitation.user.email }}</small></span></div>
+<form method="post" class="stack-form" autocomplete="off" data-loading-form>{% csrf_token %}
+  {% for field in form %}<label for="{{ field.id_for_label }}">{% if field.name == 'new_password1' %}{% t 'New password' %}{% else %}{% t 'Confirm new password' %}{% endif %}</label>{{ field }}
+    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+  {% endfor %}
+  <p class="small-note">{% t 'Use at least 10 characters, a unique password, and no shared staff passwords.' %}</p>
+  <button type="submit" class="button button-primary button-full">{% t 'Activate account' %}</button>
+</form>
+{% endblock %}

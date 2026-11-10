@@ -1,0 +1,37 @@
+{% load static translations %}
+<!doctype html>
+<html lang="{{ ui_lang|default:'en' }}" data-theme="light">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="{{ platform_brand.product_name|default:'WorldLink Hotspot Cloud' }}">
+  <title>{% block title %}Account{% endblock %} | {{ platform_brand.product_name|default:'WorldLink Hotspot Cloud' }}</title>
+  {% include 'partials/favicon.html' %}
+  <script>try{document.documentElement.dataset.theme=localStorage.getItem('whc-theme')||'light'}catch(e){};document.documentElement.classList.add('whc-js');setTimeout(()=>document.getElementById('whcPreloader')?.classList.add('is-hidden'),2200);</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=6">
+  <script defer src="{% static 'js/app.js' %}?v=6"></script>
+</head>
+<body class="auth-body">
+{% include 'partials/preloader.html' %}
+{% include 'partials/shell_icons.html' %}
+<header class="auth-toolbar">
+  <form method="post" action="{% url 'language_change' %}" class="language-form">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><select name="language" class="language-select" aria-label="Language" onchange="this.form.submit()"><option value="en" {% if ui_lang == 'en' %}selected{% endif %}>EN</option><option value="sw" {% if ui_lang == 'sw' %}selected{% endif %}>SW</option></select></form>
+  <button type="button" class="icon-button theme-toggle" data-theme-toggle aria-label="{% t 'Switch theme' %}" title="{% t 'Switch theme' %}"><svg class="icon" aria-hidden="true"><use href="#ico-moon"></use></svg></button>
+</header>
+<main class="auth-shell"><section class="auth-card">
+  <a href="{% url 'cloud:home' %}" class="auth-brand">
+    <span class="brand-mark brand-mark-auth">{% include 'partials/brand_icon.html' %}</span>
+    <span class="brand-words"><strong>{{ platform_brand.product_name|default:'WorldLink Hotspot Cloud' }}</strong><small>{{ platform_brand.name|default:'WORLDLINK SECURITY SYSTEMS' }}</small></span>
+  </a>
+  {% block auth_content %}{% endblock %}
+</section>
+<footer class="auth-foot">
+  <span class="auth-foot-company">© 2026 {{ platform_brand.name|default:'WORLDLINK SECURITY SYSTEMS' }}</span>
+  <span class="auth-foot-tagline">{{ platform_brand.tagline|default:'Linking Security to Every Corner!' }}</span>
+</footer>
+</main>
+</body>
+</html>

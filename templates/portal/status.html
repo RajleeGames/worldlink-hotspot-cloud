@@ -1,0 +1,25 @@
+{% extends 'portal/base.html' %}
+{% block guest_content %}
+<div class="guest-narrow">
+  <a class="guest-back" href="{% url 'portal:public' company.slug %}?lang={{ lang }}">← {{ w.back }}</a>
+  <section class="guest-status-panel">
+    <div class="guest-status-symbol {% if order.status == 'PAID' %}guest-status-success{% elif order.status == 'CANCELLED' %}guest-status-cancelled{% endif %}">{% if order.status == 'PENDING' %}···{% elif order.status == 'PAID' %}✓{% else %}×{% endif %}</div>
+    <h1>{{ w.thanks }}</h1>
+    <p>{% if order.status == 'PENDING' %}{{ w.pending }}{% elif order.status == 'PAID' %}{{ w.paid }}{% else %}{{ w.cancelled }}{% endif %}</p>
+    <span class="guest-status-badge">{{ w.manual }}</span>
+  </section>
+  <section class="guest-receipt">
+    <div><span>{{ w.order }}</span><strong class="guest-mono">{{ order.reference }}</strong></div>
+    <div><span>{{ w.package }}</span><strong>{{ order.plan.name }}</strong></div>
+    <div><span>{{ w.price }}</span><strong>TZS {{ order.amount|floatformat:0 }}</strong></div>
+    <div><span>{{ w.method }}</span><strong>{{ order.method.label }}</strong></div>
+    {% if order.status == 'PENDING' %}
+    <div><span>{{ w.recipient }}</span><strong>{{ order.method.account_name|default:'At business counter' }}</strong></div>
+    {% if order.method.account_number %}<div><span>{{ w.account }}</span><strong class="guest-mono">{{ order.method.account_number }}</strong></div>{% endif %}
+    {% endif %}
+  </section>
+  {% if order.status == 'PENDING' %}<section class="guest-instructions"><h2>{{ w.instructions }}</h2><p>{{ order.method.instructions|default:w.payment_notice }}</p><p class="guest-privacy">{{ w.reference }}: <b>{{ order.reference }}</b>. Keep this reference for the business staff to reconcile your request.</p></section>{% endif %}
+  <p class="guest-disclaimer">{{ w.not_live }}</p>
+  <a class="guest-primary guest-submit" href="{% url 'portal:status' company.slug order.public_id %}?lang={{ lang }}">{{ w.refresh }}</a>
+</div>
+{% endblock %}

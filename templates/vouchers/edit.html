@@ -1,0 +1,5 @@
+{% extends 'base.html' %}{% load translations %}{% block content %}
+<div class="page-heading"><div><p class="eyebrow">{% t 'Voucher operations' %}</p><h1>{% t 'Edit batch' %} #{{ batch.pk }}</h1><p>{% t 'Voucher batches' %}</p></div><a class="button button-secondary" href="{% url 'vouchers:batch_detail' batch.pk %}">← {% t 'Back' %}</a></div>
+<section class="panel form-panel"><form method="post" class="form-grid">{% csrf_token %}
+{% for field in form %}<div class="field"><label for="{{ field.id_for_label }}">{% t 'Batch label' %}</label>{{ field }}{% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}</div>{% endfor %}
+<div class="form-actions"><button class="button button-primary" type="submit">{% t 'Save' %}</button></div></form></section>{% endblock %}

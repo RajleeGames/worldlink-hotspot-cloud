@@ -1,0 +1,10 @@
+{% extends 'base.html' %}{% load translations %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">WORLDLINK · ONBOARDING</p><h1>{% t 'Invite business owner' %}</h1><p>{{ business.name }}</p></div><a href="{% url 'controlcenter:business_detail' business.pk %}" class="button button-secondary">{% t 'Back' %}</a></div>
+<section class="panel padded-panel console-form-compact"><h2>{% t 'New owner account' %}</h2>
+  <form method="post" class="stack-form" data-loading-form>{% csrf_token %}
+  {% for field in form %}<label for="{{ field.id_for_label }}">{% if field.name == 'name' %}{% t 'Full name' %}{% else %}{% t 'Email address' %}{% endif %}</label>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}{% endfor %}
+  <p class="small-note">{% t 'An unactivated account is created. The owner chooses a password using a one-use setup link.' %}</p>
+  <div class="console-actions"><button type="submit" class="button button-primary">{% t 'Create owner invitation' %}</button><a href="{% url 'controlcenter:business_detail' business.pk %}" class="button button-secondary">{% t 'Cancel' %}</a></div>
+</form></section>
+{% endblock %}

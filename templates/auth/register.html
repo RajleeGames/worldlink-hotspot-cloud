@@ -1,0 +1,8 @@
+{% extends 'auth/base_auth.html' %}{% load translations %}{% block title %}{% t 'Create an account' %}{% endblock %}{% block auth_content %}
+<div class="auth-intro"><span class="eyebrow">{% t 'Create business workspace' %}</span><h1>{% t 'Create your workspace' %}</h1><p>{% t 'Multi-business hotspot and voucher management platform.' %}</p></div>
+<form method="post" class="stack-form" autocomplete="on">{% csrf_token %}
+{% for field in form %}<label for="{{ field.id_for_label }}">{% if field.name == 'business' %}{% t 'Business name' %}{% elif field.name == 'name' %}{% t 'Full name' %}{% elif field.name == 'email' %}{% t 'Email address' %}{% elif field.name == 'password1' %}{% t 'Password' %}{% else %}{% t 'Confirm password' %}{% endif %}</label>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}{% endfor %}
+{% for error in form.non_field_errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+<button type="submit" class="button button-primary button-full">{% t 'Create an account' %} →</button>
+</form><p class="auth-links">{% t 'Already have an account?' %} <a href="{% url 'login' %}">{% t 'Sign in' %}</a></p>
+{% endblock %}

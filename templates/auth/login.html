@@ -1,0 +1,30 @@
+{% extends 'auth/base_auth.html' %}{% load translations %}
+{% block title %}{% t 'Sign in' %}{% endblock %}
+{% block auth_content %}
+<div class="auth-intro portal-intro"><h1>{% t 'Welcome back' %}</h1><p>{% t 'Choose your workspace and sign in securely.' %}</p></div>
+<div class="login-portal-choice" role="group" aria-label="Select login portal">
+  <a href="{% url 'login' %}?portal=business" class="login-portal-option {% if portal != 'staff' %}is-selected{% endif %}" {% if portal != 'staff' %}aria-current="page"{% endif %}>
+    <svg class="icon"><use href="#ico-router"></use></svg><span>{% t 'Business login' %}</span>
+  </a>
+  <a href="{% url 'login' %}?portal=staff" class="login-portal-option {% if portal == 'staff' %}is-selected{% endif %}" {% if portal == 'staff' %}aria-current="page"{% endif %}>
+    <svg class="icon"><use href="#ico-shield"></use></svg><span>{% t 'WorldLink team' %}</span>
+  </a>
+</div>
+<div class="login-portal-hint">
+  {% if portal == 'staff' %}<span class="portal-hint-dot"></span>{% t 'For authorized WorldLink team members only. Staff accounts are created privately.' %}
+  {% else %}<span class="portal-hint-dot"></span>{% t 'For hotspot operators, business owners and their employees.' %}{% endif %}
+</div>
+{% if form.errors %}<div class="flash error" role="alert">{% if form.non_field_errors %}{{ form.non_field_errors|striptags }}{% elif ui_lang == 'sw' %}Barua pepe au nenosiri si sahihi.{% else %}Check your email and password, then try again.{% endif %}</div>{% endif %}
+{% if messages %}{% for message in messages %}<div class="flash {{ message.tags }}" role="status">{{ message }}</div>{% endfor %}{% endif %}
+<form method="post" action="{% url 'login' %}" class="stack-form" autocomplete="on" data-loading-form>
+  {% csrf_token %}
+  <input type="hidden" name="portal" value="{{ portal }}">
+  <label for="id_username">{% t 'Email address' %}</label>{{ form.username }}
+  <label for="id_password">{% t 'Password' %}</label>
+  <div class="password-wrap">{{ form.password }}<button type="button" class="show-password" data-password-toggle>{% t 'Show' %}</button></div>
+  <button class="button button-primary button-full login-submit" type="submit">{% t 'Sign in' %}<svg class="icon" aria-hidden="true"><use href="#ico-arrow"></use></svg></button>
+</form>
+{% if portal != 'staff' and allow_signup %}<p class="auth-links">{% t 'New to WorldLink?' %} <a href="{% url 'register' %}">{% t 'Create an account' %}</a></p>{% endif %}
+{% if portal == 'staff' %}<p class="auth-links auth-links-muted">{% t 'Need access? Ask your WorldLink platform administrator to invite you.' %}</p>{% endif %}
+<div class="auth-security"><svg class="icon" aria-hidden="true"><use href="#ico-shield"></use></svg><span>{% t 'Secure workspace' %} · WorldLink Hotspot Cloud</span></div>
+{% endblock %}

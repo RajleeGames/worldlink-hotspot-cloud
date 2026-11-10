@@ -1,0 +1,5 @@
+Django>=5.2,<5.3
+Pillow>=11,<13
+gunicorn>=23,<25
+# Production PostgreSQL installs: pip install "psycopg[binary]>=3.2,<4"
+# Production WSGI server on Linux: pip install "gunicorn>=23,<25"

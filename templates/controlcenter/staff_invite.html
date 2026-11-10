@@ -1,0 +1,18 @@
+{% extends 'base.html' %}{% load translations %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">WORLDLINK · INTERNAL</p><h1>{% t 'Invite staff' %}</h1><p>{% t 'Staff accounts cannot be created through public registration.' %}</p></div><a class="button button-secondary" href="{% url 'controlcenter:team' %}">{% t 'Back to team' %}</a></div>
+<div class="console-form-layout">
+  <section class="panel padded-panel"><h2>{% t 'Staff account details' %}</h2>
+    <form method="post" class="stack-form" data-loading-form>{% csrf_token %}
+      {% for field in form %}<label for="{{ field.id_for_label }}">{% if field.name == 'name' %}{% t 'Full name' %}{% elif field.name == 'email' %}{% t 'Email address' %}{% else %}{% t 'Access role' %}{% endif %}</label>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}{% endfor %}
+      <p class="small-note">{% t 'No default password will be assigned. A private setup link expires in 48 hours and works only once.' %}</p>
+      <div class="console-actions"><button type="submit" class="button button-primary">{% t 'Create secure invitation' %}</button><a href="{% url 'controlcenter:team' %}" class="button button-secondary">{% t 'Cancel' %}</a></div>
+    </form>
+  </section>
+  <aside class="panel padded-panel console-aside"><h2>{% t 'Permissions explained' %}</h2>
+    <div class="console-help-row"><span class="console-role-dot"></span><div><strong>{% t 'Support Staff' %}</strong><p>{% t 'Read-only access to businesses, users, sessions overview and audit history.' %}</p></div></div>
+    {% if can_choose_manager %}<div class="console-help-row"><span class="console-role-dot is-blue"></span><div><strong>{% t 'Platform Manager' %}</strong><p>{% t 'May manage business status, invitations, customer accounts and support staff. Cannot appoint managers.' %}</p></div></div>{% endif %}
+    <p class="small-note">{% t 'Only a WorldLink Super Admin can appoint another Platform Manager.' %}</p>
+  </aside>
+</div>
+{% endblock %}

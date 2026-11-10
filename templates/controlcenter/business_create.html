@@ -1,0 +1,9 @@
+{% extends 'base.html' %}{% load translations %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">WORLDLINK · ONBOARDING</p><h1>{% t 'Create a business' %}</h1><p>{% t 'Register a hotspot operator and then invite an owner securely.' %}</p></div><a class="button button-secondary" href="{% url 'controlcenter:businesses' %}">{% t 'All businesses' %}</a></div>
+<section class="panel padded-panel console-form-compact"><h2>{% t 'Business details' %}</h2><form method="post" class="stack-form" data-loading-form>{% csrf_token %}
+  {% for field in form %}<label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}{% endfor %}
+  <p class="small-note">{% t 'New businesses do not get Wi-Fi access until their own router integrations are configured.' %}</p>
+  <div class="console-actions"><button class="button button-primary" type="submit">{% t 'Create business' %}</button><a class="button button-secondary" href="{% url 'controlcenter:businesses' %}">{% t 'Cancel' %}</a></div>
+</form></section>
+{% endblock %}

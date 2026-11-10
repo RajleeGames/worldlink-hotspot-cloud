@@ -1,0 +1,3 @@
+{% extends 'auth/base_auth.html' %}{% load translations %}{% block title %}{% t 'Registration unavailable' %}{% endblock %}{% block auth_content %}
+<div class="auth-intro"><span class="eyebrow">{% t 'Business access' %}</span><h1>{% t 'Registration unavailable' %}</h1><p>{% t 'Platform sign-up is currently closed. Contact WorldLink to activate an account.' %}</p></div><a href="{% url 'login' %}" class="button button-primary button-full">{% t 'Sign in' %}</a>
+{% endblock %}

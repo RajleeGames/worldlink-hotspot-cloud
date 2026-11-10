@@ -1,0 +1,24 @@
+{% extends 'portal/base.html' %}
+{% block guest_content %}
+<div class="guest-narrow">
+  <a class="guest-back" href="{% url 'portal:public' company.slug %}?lang={{ lang }}">← {{ w.back }}</a>
+  <div class="guest-page-title"><span class="guest-eyebrow">{{ w.manual }}</span><h1>{{ w.payment }}</h1><p>{{ w.payment_notice }}</p></div>
+  <div class="guest-order-summary"><div><small>{{ w.package }}</small><h2>{{ plan.name }}</h2><span>{{ plan.duration_minutes }} {{ w.minutes }} · {{ plan.device_limit }} {{ w.devices }}</span></div><div class="guest-amount"><small>TZS</small><strong>{{ plan.price|floatformat:0 }}</strong></div></div>
+  {% if methods %}
+  <form method="post" class="guest-form" action="{% url 'portal:checkout' company.slug plan.pk %}?lang={{ lang }}" autocomplete="on">
+    {% csrf_token %}<input type="hidden" name="lang" value="{{ lang }}">
+    {% if form.non_field_errors %}<div class="guest-alert">{{ form.non_field_errors }}</div>{% endif %}
+    <label class="guest-label" for="{{ form.customer_name.id_for_label }}">{{ w.customer_name }}</label>{{ form.customer_name }}
+    {% if form.customer_name.errors %}<div class="guest-error">{{ form.customer_name.errors }}</div>{% endif %}
+    <label class="guest-label" for="{{ form.customer_phone.id_for_label }}">{{ w.phone }}</label>{{ form.customer_phone }}
+    {% if form.customer_phone.errors %}<div class="guest-error">{{ form.customer_phone.errors }}</div>{% endif %}
+    <fieldset class="guest-methods"><legend>{{ w.method }}</legend>
+      {% for m in methods %}<label class="guest-method"><input type="radio" name="method" value="{{ m.pk }}" required {% if form.data.method == m.pk|stringformat:'s' %}checked{% endif %}><span class="guest-radio-visual"></span><span><strong>{{ m.label }}</strong><small>{{ m.get_channel_display }} · {{ w.manual }}</small></span></label>{% endfor %}
+    </fieldset>
+    {% if form.method.errors %}<div class="guest-error">{{ form.method.errors }}</div>{% endif %}
+    <p class="guest-privacy">{{ w.privacy }}</p>
+    <button type="submit" class="guest-primary guest-submit">{{ w.continue }} →</button>
+  </form>
+  {% else %}<div class="guest-alert">{{ w.no_methods }}</div>{% endif %}
+</div>
+{% endblock %}

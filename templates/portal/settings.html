@@ -1,0 +1,11 @@
+{% extends 'base.html' %}{% load translations %}{% block content %}
+<div class="page-heading"><div><p class="eyebrow">Guest Wi-Fi</p><h1>Captive portal</h1><p>Give your business a branded customer Wi-Fi landing page. Router activation is not connected yet.</p></div><a class="button button-secondary" href="{{ public_url }}" target="_blank" rel="noopener">View public portal ↗</a></div>
+<div class="portal-dashboard-split">
+<section class="panel"><div class="panel-heading"><div><h2>Portal appearance</h2><p>Business logo is managed under Business Settings.</p></div></div>
+<form class="form-body" method="post">{% csrf_token %}
+{% if form.non_field_errors %}<div class="flash error">{{ form.non_field_errors }}</div>{% endif %}
+<div class="portal-edit-grid">{% for field in form %}<label class="portal-edit-field {% if field.name == 'terms' %}portal-wide{% endif %}"><span>{{ field.label }}</span>{% if field.field.widget.input_type == 'checkbox' %}<span class="portal-checkbox">{{ field }} Show this portal to guests</span>{% else %}{{ field }}{% endif %}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% if field.errors %}<small class="guest-error">{{ field.errors }}</small>{% endif %}</label>{% endfor %}</div>
+<div class="form-actions"><button class="button button-primary" type="submit">Save portal settings</button></div></form></section>
+<aside class="panel portal-side-panel"><div class="panel-heading"><h2>Public access</h2></div><div class="portal-guidance"><div class="portal-url">{{ public_url }}</div><p>Share this link with your customers or use it as the URL in a compatible router's captive portal redirect.</p><p class="portal-small-note">The portal can display packages and create pending manual payment requests. It does not yet grant internet sessions.</p><a class="button button-secondary button-full" href="{% url 'payments:methods' %}">Configure payment methods</a><a class="button button-secondary button-full" href="{% url 'networks:plans' %}">Manage packages</a></div></aside>
+</div>
+{% endblock %}

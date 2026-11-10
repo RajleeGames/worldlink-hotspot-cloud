@@ -1,0 +1,25 @@
+{% extends 'portal/base.html' %}
+{% block guest_content %}
+<section class="guest-hero">
+  <div class="guest-eyebrow"><span class="guest-online-dot"></span>{{ w.tagline }}</div>
+  <h1>{% if lang == 'sw' %}{{ portal.headline_sw }}{% else %}{{ portal.headline_en }}{% endif %}</h1>
+  <p>{% if lang == 'sw' %}{{ portal.subtitle_sw }}{% else %}{{ portal.subtitle_en }}{% endif %}</p>
+</section>
+<div class="guest-section-heading"><h2>{{ w.packages }}</h2><span>{{ plans|length }} {{ w.packages|lower }}</span></div>
+<div class="guest-plan-grid">
+  {% for plan in plans %}
+  <article class="guest-plan">
+    <div class="guest-plan-top"><span class="guest-plan-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 8a14 14 0 0 1 18 0M6 12a9 9 0 0 1 12 0M9.5 16a4 4 0 0 1 5 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="20" r="1.4" fill="currentColor"/></svg></span><span class="guest-plan-number">0{{ forloop.counter }}</span></div>
+    <h3>{{ plan.name }}</h3><div class="guest-price"><small>TZS</small> {{ plan.price|floatformat:0 }}</div>
+    <div class="guest-plan-specs"><span><b>{{ plan.duration_minutes }}</b> {{ w.minutes }}</span><span><b>{{ plan.device_limit }}</b> {{ w.devices }}</span><span><b>{{ plan.download_kbps }}</b> Kbps ↓</span><span>{% if plan.data_limit_mb %}{{ plan.data_limit_mb }} MB{% else %}{{ w.unlimited }}{% endif %}</span></div>
+    {% if methods_count %}<a class="guest-primary" href="{% url 'portal:checkout' company.slug plan.pk %}?lang={{ lang }}">{{ w.buy }} <span aria-hidden="true">→</span></a>{% else %}<span class="guest-primary guest-disabled" aria-disabled="true">{{ w.no_methods }}</span>{% endif %}
+  </article>
+  {% empty %}<div class="guest-empty">{{ w.no_packages }}</div>{% endfor %}
+</div>
+<div class="guest-bottom-grid">
+  <section class="guest-info"><div class="guest-minor-icon">#</div><div><h3>{{ w.voucher }}</h3><p>{{ w.voucher_note }}</p></div></section>
+  <section class="guest-info"><div class="guest-minor-icon">?</div><div><h3>{{ w.help }}</h3><p>{% if portal.support_phone %}<a href="tel:{{ portal.support_phone }}">{{ portal.support_phone }}</a>{% elif company.phone %}{{ company.phone }}{% else %}{{ w.contact }}{% endif %}</p></div></section>
+</div>
+{% if portal.terms %}<p class="guest-terms">{{ portal.terms|linebreaksbr }}</p>{% endif %}
+<p class="guest-disclaimer">{{ w.not_live }}</p>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends 'base.html' %}{% load translations %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">{% t 'Account' %} / {% t 'Your business identity' %}</p><h1>{% t 'Business settings' %}</h1><p>{% t 'Manage business information' %}</p></div></div>
+<section class="panel settings-panel">
+  <form method="post" enctype="multipart/form-data" class="settings-form" data-loading-form>
+    {% csrf_token %}
+    <div class="settings-brand-row">
+      <div class="settings-logo-preview" data-logo-preview>{% if active_company.logo %}<img src="{{ active_company.logo.url }}" alt="Company logo">{% else %}<span>{{ active_company.name|first|upper }}</span>{% endif %}</div>
+      <div class="settings-logo-copy"><h2>{% t 'Company logo' %}</h2><p>{% t 'Appears in your business workspace.' %} PNG/JPG/WebP · max 2 MB.</p>{{ form.logo }}{% for error in form.logo.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+    </div>
+    <div class="settings-divider"></div>
+    <div class="form-grid">
+      {% for field in form %}{% if field.name != 'logo' %}<div class="field"><label for="{{ field.id_for_label }}">{% t field.label %}</label>{{ field }}{% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}</div>{% endif %}{% endfor %}
+      <div class="form-actions"><button type="submit" class="button button-primary">{% t 'Save changes' %}</button></div>
+    </div>
+  </form>
+  <div class="settings-meta"><div class="setting-strip"><span>{% t 'Account status' %}</span><strong class="pill">{{ active_company.get_status_display }}</strong></div><div class="setting-strip"><span>{% t 'Subscription' %}</span><strong>{{ active_company.subscription_ends|date:'d M Y'|default:'Not configured' }}</strong></div></div>
+</section>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends 'base.html' %}{% load translations %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">WORLDLINK · INTERNAL</p><h1>{{ person.get_full_name|default:person.username }}</h1><p>{{ person.email|default:person.username }}</p></div><a href="{% url 'controlcenter:team' %}" class="button button-secondary">{% t 'Back to team' %}</a></div>
+<div class="detail-grid"><section class="panel padded-panel"><h2>{% t 'Account details' %}</h2><dl class="detail-list">
+  <div><dt>{% t 'Access role' %}</dt><dd>{% if person_role == 'OWNER' %}{% t 'Super Admin' %}{% elif person_role == 'MANAGER' %}{% t 'Platform Manager' %}{% else %}{% t 'Support Staff' %}{% endif %}</dd></div>
+  <div><dt>{% t 'Account status' %}</dt><dd>{% if person.is_active %}{% t 'Active' %}{% elif person.has_usable_password %}{% t 'Disabled' %}{% else %}{% t 'Awaiting activation' %}{% endif %}</dd></div>
+  <div><dt>{% t 'Email address' %}</dt><dd>{{ person.email }}</dd></div><div><dt>{% t 'Created' %}</dt><dd>{{ person.date_joined|date:'d M Y H:i' }}</dd></div>
+  <div><dt>{% t 'Last login' %}</dt><dd>{{ person.last_login|date:'d M Y H:i'|default:'—' }}</dd></div>
+  {% if invitation %}<div><dt>{% t 'Latest invitation' %}</dt><dd>{% if invitation.accepted_at %}{% t 'Accepted' %}{% elif invitation.revoked_at %}{% t 'Revoked' %}{% elif invitation.is_pending %}{% t 'Pending' %}{% else %}{% t 'Expired' %}{% endif %}</dd></div>{% endif %}
+</dl></section>
+<section class="panel padded-panel"><h2>{% t 'Team permissions' %}</h2>
+  {% if can_manage_target %}
+    {% if person.has_usable_password %}
+    <form method="post" action="{% url 'controlcenter:staff_update' person.pk %}" class="stack-form console-section-form">{% csrf_token %}<input type="hidden" name="action" value="role">
+      <label for="staffRole">{% t 'Access role' %}</label><select class="input" name="role" id="staffRole"><option value="SUPPORT" {% if person_role == 'SUPPORT' %}selected{% endif %}>{% t 'Support Staff' %}</option>{% if allow_manager_role %}<option value="MANAGER" {% if person_role == 'MANAGER' %}selected{% endif %}>{% t 'Platform Manager' %}</option>{% endif %}</select>
+      <button type="submit" class="button button-primary" data-confirm="Change staff permissions?">{% t 'Save role' %}</button>
+    </form>
+    {% endif %}
+    <form method="post" action="{% url 'controlcenter:staff_update' person.pk %}" class="console-section-form">{% csrf_token %}
+      {% if person.is_active %}<input type="hidden" name="action" value="disable"><button type="submit" class="button button-secondary" data-confirm="Disable this team member?">{% t 'Disable staff access' %}</button>
+      {% elif person.has_usable_password %}<input type="hidden" name="action" value="enable"><button type="submit" class="button button-secondary">{% t 'Enable staff access' %}</button>
+      {% else %}<input type="hidden" name="action" value="reinvite"><button type="submit" class="button button-secondary" data-confirm="Replace the previous invitation with a new link?">{% t 'Reissue invitation' %}</button>{% endif %}
+    </form>
+  {% else %}<p class="muted">{% t 'This account is read-only for your role. You cannot edit yourself or higher-level administrators.' %}</p>{% endif %}
+  <p class="small-note">{% t 'All changes are recorded in the platform audit log.' %}</p>
+</section></div>
+{% endblock %}

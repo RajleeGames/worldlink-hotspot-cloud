@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-heading">
+ <div><p class="eyebrow">Payments · Provider testing</p><h1>EvPay test lab</h1><p>Test authentication, mobile-money requests, verified callbacks and reconciliation — without router authorization.</p></div>
+ <div class="heading-actions"><a href="{% url 'payments:orders' %}" class="button button-secondary">Payment requests</a><a href="{% url 'payments:methods' %}" class="button button-secondary">Merchant methods</a></div>
+</div>
+<div class="evpay-state-bar"><span class="evpay-led"></span><span>Merchant environment: <strong>{{ environment|upper }}</strong></span><span class="evpay-state-divider"></span><span>Isolated test ledger — no Wi-Fi credentials issued</span></div>
+<div class="evpay-grid">
+ <section class="panel evpay-panel">
+  <div class="panel-heading"><div><h2>01 · Authentication</h2><p>Confirm that EvPay accepts your merchant credentials.</p></div></div>
+  <div class="evpay-panel-body">
+   <p class="evpay-copy">Credentials remain on the server in your <code>.env</code>. The access token is never sent to your browser.</p>
+   <form method="post" action="{% url 'payments:evpay_auth' %}">{% csrf_token %}<button class="button button-secondary" type="submit">Test API authentication</button></form>
+  </div>
+ </section>
+ <section class="panel evpay-panel">
+  <div class="panel-heading"><div><h2>02 · Test USSD collection</h2><p>Only submit a number you control or have permission to test.</p></div></div>
+  <form class="evpay-panel-body evpay-form" method="post" action="{% url 'payments:evpay_start' %}">{% csrf_token %}
+   <label>Operator{{ form.operator }}</label>
+   <label>Payer phone number{{ form.phone }}</label>
+   <label>Amount (TZS){{ form.amount }}</label>
+   <label class="evpay-consent">{{ form.authorized }} <span>I am authorized to test this payer number. In live mode a real charge may be initiated.</span></label>
+   <p class="evpay-copy">{% if environment == 'sandbox' %}Sandbox simulates a response — no phone prompt or real charge. Use <code>255700000001</code> for insufficient funds and <code>255700000002</code> for invalid PIN.{% else %}<strong>LIVE MODE</strong>: initiating this request may cause a REAL mobile-money charge. Check amount and phone carefully.{% endif %}</p>
+   <button type="submit" class="button button-primary" {% if live_locked %}disabled{% endif %}>{% if environment == 'sandbox' %}Submit sandbox USSD test{% else %}Initiate real USSD push{% endif %}</button>
+   {% if live_locked %}<span class="evpay-warning">Live charges are locked by server configuration.</span>{% endif %}
+  </form>
+ </section>
+</div>
+<section class="panel">
+ <div class="panel-heading"><div><h2>03 · Payment test history</h2><p>Signed notifications update the status automatically. Reconcile checks the authenticated EvPay status endpoint.</p></div></div>
+ <div class="table-wrap"><table class="data-table evpay-table"><thead><tr><th>Reference</th><th>Date</th><th>Operator</th><th>Amount</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+ {% for item in tests %}<tr><td><span class="evpay-reference">{{ item.reference }}</span><small class="evpay-meta">{{ item.environment|upper }}{% if item.transaction_id %} · {{ item.transaction_id }}{% endif %}</small></td><td>{{ item.created_at|date:'d M Y H:i' }}</td><td>{{ item.get_operator_display }}</td><td>TZS {{ item.amount|floatformat:0 }}</td><td>{{ item.phone|slice:':6' }}••••{{ item.phone|slice:'-2:' }}</td><td><span class="evpay-status evpay-status-{{ item.status|lower }}">{{ item.status }}</span>{% if item.last_error %}<small class="evpay-meta" title="{{ item.last_error }}">Review provider response</small>{% endif %}</td><td><form method="post" action="{% url 'payments:evpay_reconcile' item.pk %}">{% csrf_token %}<button class="button button-secondary button-small">Check status</button></form></td></tr>
+ {% empty %}<tr><td colspan="7" class="empty">No EvPay tests yet. Authenticate first, then submit a sandbox request.</td></tr>{% endfor %}
+ </tbody></table></div>
+</section>
+<p class="evpay-footnote">Payment tests are isolated from customer portal orders and voucher allocation. No USSD result, including SUCCESS or SETTLED, activates a router in this release.</p>
+{% endblock %}

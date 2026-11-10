@@ -1,0 +1,10 @@
+{% extends 'base.html' %}{% load translations %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">WORLDLINK · PLATFORM SETTINGS</p><h1>{% t 'Platform branding' %}</h1><p>{% t 'WorldLink identity used on the login, sidebar and browser favicon.' %}</p></div><a href="{% url 'controlcenter:overview' %}" class="button button-secondary">{% t 'Control Center' %}</a></div>
+<div class="console-form-layout"><section class="panel padded-panel"><h2>{% t 'Brand settings' %}</h2>
+<form method="post" action="{% url 'controlcenter:branding_update' %}" enctype="multipart/form-data" class="stack-form">{% csrf_token %}
+  <div class="console-brand-preview"><span class="brand-mark">{% include 'partials/brand_icon.html' %}</span><div><strong>{{ platform_brand.name|default:'WORLDLINK SECURITY SYSTEMS' }}</strong><small>{% t 'Uploaded logo also becomes the favicon.' %}</small></div></div>
+  {% for field in form %}<label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}{% endfor %}
+  {% if can_edit_branding %}<button type="submit" class="button button-primary">{% t 'Save branding' %}</button>{% else %}<p class="small-note">{% t 'Only a WorldLink Super Admin may save platform branding.' %}</p>{% endif %}
+</form></section><aside class="panel padded-panel console-aside"><h2>{% t 'Branding and security' %}</h2><p>{% t 'The same logo is shown across the platform. Each hotspot business manages its own workspace logo separately.' %}</p><p class="small-note">{% t 'Recommended logo: square PNG, under 2 MB. SVG upload is disabled for safety.' %}</p></aside></div>
+{% endblock %}

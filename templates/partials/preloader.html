@@ -1,0 +1,11 @@
+{% load translations %}
+<div id="whcPreloader" class="whc-preloader" role="status" aria-live="polite" aria-label="{% if ui_lang == 'sw' %}Inapakia{% else %}Loading{% endif %}">
+  <div class="whc-preloader-inner">
+    <div class="whc-loader-emblem" aria-hidden="true">
+      <span class="whc-loader-ring"></span>
+      <span class="whc-loader-logo">{% include 'partials/brand_icon.html' %}</span>
+    </div>
+    <div class="whc-loader-title">{{ platform_brand.product_name|default:'WorldLink Hotspot Cloud' }}</div>
+    <div class="whc-loader-caption">{% if ui_lang == 'sw' %}Inafungua mfumo…{% else %}Opening workspace…{% endif %}</div>
+  </div>
+</div>

@@ -1,0 +1,1 @@
+{% load static %}{% if platform_brand and platform_brand.logo %}<link rel="icon" href="{{ platform_brand.logo.url }}">{% else %}<link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">{% endif %}

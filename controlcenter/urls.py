@@ -1,0 +1,26 @@
+from django.urls import path
+from . import views
+urlpatterns = [
+    path('', views.overview, name='overview'),
+    path('businesses/', views.businesses, name='businesses'),
+    path('businesses/new/', views.business_create, name='business_create'),
+    path('businesses/<int:pk>/', views.business_detail, name='business_detail'),
+    path('businesses/<int:pk>/update/', views.business_update, name='business_update'),
+    path('businesses/<int:pk>/invite-owner/', views.business_invite_owner, name='business_invite_owner'),
+    path('businesses/<int:pk>/add-member/', views.business_add_member, name='business_add_member'),
+    path('users/', views.users, name='users'),
+    path('users/<int:pk>/', views.user_detail, name='user_detail'),
+    path('users/<int:pk>/access/', views.user_access_update, name='user_access_update'),
+    path('hotspot-customers/', views.platform_customers, name='platform_customers'),
+    path('sessions/', views.platform_sessions, name='platform_sessions'),
+    path('payments/', views.platform_payments, name='platform_payments'),
+    path('team/', views.team, name='team'),
+    path('team/invite/', views.staff_invite, name='staff_invite'),
+    path('team/invitation/', views.invitation_created, name='invitation_created'),
+    path('team/<int:pk>/', views.staff_detail, name='staff_detail'),
+    path('team/<int:pk>/update/', views.staff_update, name='staff_update'),
+    path('branding/', views.branding, name='branding'),
+    path('branding/update/', views.branding_update, name='branding_update'),
+    path('audit/', views.audit, name='audit'),
+    path('join/<int:pk>/<str:token>/', views.accept_invitation, name='accept_invitation'),
+]

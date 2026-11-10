@@ -1,0 +1,15 @@
+{% extends 'base.html' %}{% load translations %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">WORLDLINK · INVITATION</p><h1>{% t 'Secure invitation' %}</h1><p>{% t 'Share the account activation link directly with the intended person.' %}</p></div><a href="{% if invitation and 'Business owner' in invitation.purpose %}{% url 'controlcenter:businesses' %}{% else %}{% url 'controlcenter:team' %}{% endif %}" class="button button-secondary">{% t 'Back' %}</a></div>
+<section class="panel padded-panel console-invite-panel">
+{% if invitation %}
+  <div class="console-success-mark"><svg class="icon"><use href="#ico-shield"></use></svg></div>
+  <h2>{% t 'Invitation created' %}</h2>
+  <p class="muted">{{ invitation.purpose }} · {{ invitation.email }}</p>
+  <p>{% t 'Copy this link now. It is displayed once, is valid for 48 hours, and stops working after the password is set.' %}</p>
+  <label class="copy-field-label" for="inviteLink">{% t 'Private setup link' %}</label>
+  <div class="console-copy-row"><input class="input" id="inviteLink" readonly value="{{ invitation.link }}" spellcheck="false" autocomplete="off"><button type="button" class="button button-primary" data-copy-target="inviteLink">{% t 'Copy link' %}</button></div>
+  <p class="small-note">{% t 'Share through a secure private channel. Do not publish the link or put it in a public group.' %}</p>
+{% else %}<h2>{% t 'Link no longer displayed' %}</h2><p class="muted">{% t 'Invitation links are shown only once. You can reissue an unused staff invitation from the team member page.' %}</p>{% endif %}
+</section>
+{% endblock %}
