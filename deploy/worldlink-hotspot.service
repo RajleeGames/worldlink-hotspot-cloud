@@ -1,0 +1,20 @@
+[Unit]
+Description=WorldLink Hotspot Cloud — Gunicorn
+After=network.target
+
+[Service]
+Type=simple
+User=miraji
+Group=miraji
+WorkingDirectory=/var/www/worldlink-hotspot-cloud
+Environment=PYTHONUNBUFFERED=1
+Environment=DJANGO_SETTINGS_MODULE=config.settings
+UMask=0027
+ExecStart=/var/www/worldlink-hotspot-cloud/.venv/bin/gunicorn --workers 2 --threads 2 --timeout 45 --bind 127.0.0.1:8095 --access-logfile - --error-logfile - config.wsgi:application
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

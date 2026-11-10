@@ -11,3 +11,11 @@ staticfiles/
 *.log
 media/
 .DS_Store
+
+# Local secrets/backups and SQLite sidecars (never commit)
+.env.*
+!.env.example
+*.sqlite3-*
+*.sqlite3.*
+*.before_vps_patch
+*.backup-*
