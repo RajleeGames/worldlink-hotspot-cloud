@@ -141,18 +141,50 @@ def dashboard(request):
 @require_tenant()
 def reports(request):
     company=request.active_company
+    source=request.GET.get('source', 'all')
+    if source not in ('all', 'manual', 'evpay'):
+        source='all'
     today=timezone.localdate()
     days=[]
-    sales=ManualSale.objects.filter(company=company,created_at__date__gte=today-timedelta(days=6)).values('created_at__date').annotate(total=Sum('amount'))
-    lookup={str(x['created_at__date']):float(x['total']) for x in sales}
+    manual=ManualSale.objects.filter(company=company)
+    # Never treat pending/failed USSD requests as revenue.
+    evpay=EvPayCollection.objects.filter(company=company,status__in=EARNING_STATUSES,
+                                         confirmed_at__isnull=False)
+    manual_total=manual.aggregate(total=Sum('amount'))['total'] or 0
+    evpay_total=evpay.aggregate(total=Sum('amount'))['total'] or 0
+    lookup={}
+    if source in ('all','manual'):
+        for item in manual.filter(created_at__date__gte=today-timedelta(days=6)).values('created_at__date').annotate(total=Sum('amount')):
+            key=str(item['created_at__date'])
+            lookup[key]=lookup.get(key,0)+item['total']
+    if source in ('all','evpay'):
+        for item in evpay.filter(confirmed_at__date__gte=today-timedelta(days=6)).values('confirmed_at__date').annotate(total=Sum('amount')):
+            key=str(item['confirmed_at__date'])
+            lookup[key]=lookup.get(key,0)+item['total']
     for back in range(6,-1,-1):
         date=today-timedelta(days=back)
         days.append({'label':date.strftime('%a %d'),'amount':lookup.get(str(date),0)})
     maximum=max([d['amount'] for d in days] or [0])
     for item in days:
         item['height']=round((item['amount']/maximum)*100) if maximum else 0
-    recent=ManualSale.objects.filter(company=company).select_related('voucher__batch__plan','recorded_by')[:60]
-    return render(request,'cloud/reports.html',{'page_title':'Sales reports','days':days,'recent':recent,'total':ManualSale.objects.filter(company=company).aggregate(total=Sum('amount'))['total'] or 0, 'expenses_total':Expense.objects.filter(company=company).aggregate(total=Sum('amount'))['total'] or 0})
+    recent=[]
+    if source in ('all','manual'):
+        recent.extend({'date':sale.created_at,'reference':sale.voucher.code,
+                       'plan':sale.voucher.batch.plan.name,'method':sale.get_method_display(),
+                       'amount':sale.amount,'source':'manual'}
+                      for sale in manual.select_related('voucher__batch__plan')[:60])
+    if source in ('all','evpay'):
+        recent.extend({'date':item.confirmed_at,'reference':item.reference,'plan':item.plan.name,
+                       'method':'EvPay','amount':item.amount,'source':'evpay'}
+                      for item in evpay.select_related('plan')[:60])
+    recent.sort(key=lambda item:item['date'], reverse=True)
+    total=(manual_total if source == 'manual' else evpay_total if source == 'evpay'
+           else manual_total+evpay_total)
+    return render(request,'cloud/reports.html',{
+        'page_title':'Sales reports','days':days,'recent':recent[:60],
+        'total':total,'manual_total':manual_total,'evpay_total':evpay_total,'source':source,
+        'expenses_total':Expense.objects.filter(company=company).aggregate(total=Sum('amount'))['total'] or 0,
+    })
 
 @login_required
 def profile(request):

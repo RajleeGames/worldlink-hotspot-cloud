@@ -272,3 +272,22 @@ class CollectionSafetyTests(TestCase):
         with patch('payments.management.commands.reconcile_evpay_collections.retrieve_ussd') as check:
             call_command('reconcile_evpay_collections', '--fast')
             check.assert_not_called()
+
+    def test_success_automatically_progresses_to_provider_settled_not_wallet_available(self):
+        obj = self._collection()
+        EvPayCollection.objects.filter(pk=obj.pk).update(
+            status='SUCCESS', confirmed_at=timezone.now() - timedelta(minutes=6),
+            created_at=timezone.now() - timedelta(minutes=8),
+            last_checked_at=timezone.now() - timedelta(minutes=7))
+        result = {'customReference': obj.reference, 'status': 'SETTLED',
+                  'amount': 500, 'currency': 'TZS', 'transRef': 'provider-verified'}
+        with patch('payments.management.commands.reconcile_evpay_collections.retrieve_ussd',
+                   return_value=result) as check:
+            call_command('reconcile_evpay_collections', '--fast')
+            check.assert_called_once_with(obj.reference)
+        obj.refresh_from_db()
+        self.assertEqual(obj.status, 'SETTLED')
+        self.assertFalse(BusinessWallet.objects.filter(company=self.company).exists())
+        with patch('payments.management.commands.reconcile_evpay_collections.retrieve_ussd') as check:
+            call_command('reconcile_evpay_collections', '--fast')
+            check.assert_not_called()

@@ -27,6 +27,46 @@ class HotspotCustomer(models.Model):
         return self.full_name
 
 
+class OmadaClientObservation(models.Model):
+    """Read-only, short-lived sighting from a *staff-approved* Omada AP.
+
+    Not a payment receipt or an internet authorization. Absence/staleness
+    must never be represented as an online connection.
+    """
+
+    company = models.ForeignKey('tenants.Company', on_delete=models.CASCADE, related_name='omada_clients')
+    router = models.ForeignKey('networks.Router', on_delete=models.CASCADE, related_name='observed_clients')
+    mac_address = models.CharField(max_length=17)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    device_type = models.CharField(max_length=80, blank=True)
+    ssid_name = models.CharField(max_length=64)
+    observed_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['router', 'mac_address'], name='whc_one_omada_client_per_ap')]
+        indexes = [models.Index(fields=['company', 'observed_at'], name='whc_omada_client_seen_idx')]
+
+    @property
+    def online(self):
+        from networks.models import OmadaDeviceObservation
+        delta = (timezone.now() - self.observed_at).total_seconds()
+        if not 0 <= delta <= 120:
+            return False
+        try:
+            ap = self.router.omada_observation
+        except OmadaDeviceObservation.DoesNotExist:
+            return False
+        return ap.state == 'CONNECTED' and ap.is_fresh
+
+    def clean(self):
+        super().clean()
+        if self.router_id and self.company_id and self.router.company_id != self.company_id:
+            raise ValidationError({'router': 'The device must belong to the same business.'})
+
+    def __str__(self):
+        return f'{self.mac_address} on {self.router.name}'
+
+
 class HotspotSession(models.Model):
     class Source(models.TextChoices):
         DEMO = 'DEMO', 'Demo only'

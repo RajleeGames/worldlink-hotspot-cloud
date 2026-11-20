@@ -48,8 +48,15 @@ class Command(BaseCommand):
         qs = EvPayCollection.objects.filter(
             company_id__in=settings.EVPAY_COLLECTION_COMPANY_IDS,
             environment=settings.EVPAY_ENVIRONMENT,
-            status__in=('CREATED', 'UNKNOWN', 'PENDING', 'PROCESSING', 'ON-HOLD'),
+            status__in=('CREATED', 'UNKNOWN', 'PENDING', 'PROCESSING', 'ON-HOLD', 'SUCCESS', 'SETTLED'),
         )
+        # SUCCESS is customer-paid, NOT merchant-settled (per EvPay API).
+        # Revisit it automatically until SETTLED/reversed; re-check recent
+        # SETTLED records occasionally for late reversals. Read only; this
+        # never marks bank funds withdrawable or initiates new charges.
+        pending = Q(status__in=('CREATED', 'UNKNOWN', 'PENDING', 'PROCESSING', 'ON-HOLD'))
+        successful = Q(status='SUCCESS', created_at__gte=now-timedelta(days=14))
+        settled = Q(status='SETTLED', created_at__gte=now-timedelta(days=7))
         if fast:
             # The first three minutes matter for customers waiting on Wi-Fi.
             # Bound API requests per reference; stale payments use a slower cadence.
@@ -62,11 +69,19 @@ class Command(BaseCommand):
                       & (first_attempt | Q(last_checked_at__lt=now - timedelta(seconds=30))))
             slow = (Q(created_at__lt=older)
                     & (first_attempt | Q(last_checked_at__lt=now - timedelta(minutes=5))))
-            qs = qs.filter(rapid | medium | slow)
+            waiting = pending & (rapid | medium | slow)
+            confirm_settlement = successful & Q(created_at__lt=now-timedelta(minutes=1)) & (
+                Q(last_checked_at__isnull=True) | Q(last_checked_at__lt=now-timedelta(minutes=5)))
+            late_reversal = settled & (Q(last_checked_at__isnull=True)
+                                       | Q(last_checked_at__lt=now-timedelta(hours=1)))
+            qs = qs.filter(waiting | confirm_settlement | late_reversal)
         else:
-            qs = qs.filter(created_at__lt=now - timedelta(minutes=1)).filter(
-                Q(last_checked_at__isnull=True) |
-                Q(last_checked_at__lt=now - timedelta(minutes=5)))
+            qs = qs.filter(
+                (pending | successful) & Q(created_at__lt=now-timedelta(minutes=1))
+                & (Q(last_checked_at__isnull=True) | Q(last_checked_at__lt=now-timedelta(minutes=5)))
+                | settled & (Q(last_checked_at__isnull=True)
+                             | Q(last_checked_at__lt=now-timedelta(hours=1))),
+            )
         for item in qs.order_by('created_at')[:max(0, min(limit, 100))]:
             try:
                 data = retrieve_ussd(item.reference)

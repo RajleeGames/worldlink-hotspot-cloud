@@ -43,6 +43,7 @@ def dashboard(request):
         'destinations': destinations, 'withdrawals': withdrawals, 'collections': collections,
         'can_withdraw': request.active_membership.role == 'OWNER',
         'evpay_verified_total': evpay.aggregate(total=Sum('amount'))['total'] or 0,
+        'evpay_provider_settled': evpay.filter(status=EvPayCollection.Status.SETTLED).aggregate(total=Sum('amount'))['total'] or 0,
         'evpay_waiting_clearance': uncredited.aggregate(total=Sum('amount'))['total'] or 0,
         'recent_evpay': evpay.select_related('plan')[:15],
     })

@@ -6,7 +6,7 @@
     <h1>{{ w.mobile_title }}</h1><p>{{ w.mobile_intro }}</p></div>
   <div class="guest-order-summary"><div><small>{{ w.package }}</small><h2>{{ plan.name }}</h2><span>{{ plan.duration_minutes }} {{ w.minutes }} · {{ plan.device_limit }} {{ w.devices }}</span></div>
     <div class="guest-amount"><small>TZS</small><strong>{{ plan.price|floatformat:0 }}</strong></div></div>
-  <form method="post" class="guest-form" autocomplete="on">
+  <form method="post" class="guest-form" autocomplete="on" data-loading-form data-processing-label="{% if lang == 'sw' %}Tunatuma ombi la malipo…{% else %}Sending payment request…{% endif %}">
     {% csrf_token %}{{ form.nonce }}<input type="hidden" name="lang" value="{{ lang }}">
     {% if form.non_field_errors %}<div class="guest-alert">{{ form.non_field_errors }}</div>{% endif %}
     <label class="guest-label" for="{{ form.customer_name.id_for_label }}">{{ w.customer_name }}</label>{{ form.customer_name }}

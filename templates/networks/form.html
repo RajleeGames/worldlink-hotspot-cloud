@@ -1,29 +1,29 @@
 {% extends 'base.html' %}{% load translations %}
 {% block content %}
-<div class="page-heading"><div><p class="eyebrow">NETWORK · DEVICE REGISTRATION</p><h1>{{ page_title }}</h1>
-  <p>{% if form_type == 'router' %}One easy registration for TP-Link Omada or MikroTik. Each business manages only its own devices.{% else %}Configure your business network.{% endif %}</p></div>
-  <a class="button button-secondary" href="{% if form_type == 'router' %}{% url 'networks:routers' %}{% elif form_type == 'location' %}{% url 'networks:locations' %}{% else %}{% url 'networks:plans' %}{% endif %}">← Back</a></div>
+<div class="page-heading"><div><p class="eyebrow">{% t 'Network · Device registration' %}</p><h1>{% t page_title %}</h1>
+  <p>{% if form_type == 'router' %}{% t 'Register TP-Link Omada or MikroTik for your business.' %}{% else %}{% t 'Configure your business network.' %}{% endif %}</p></div>
+  <a class="button button-secondary" href="{% if form_type == 'router' %}{% url 'networks:routers' %}{% elif form_type == 'location' %}{% url 'networks:locations' %}{% else %}{% url 'networks:plans' %}{% endif %}">← {% t 'Back' %}</a></div>
 {% if form_type == 'router' %}
-<div class="onboard-progress"><div><span class="onboard-step">01</span><strong>Register device</strong><small>Model and serial from its label</small></div>
-  <div><span class="onboard-step">02</span><strong>Connect network</strong><small>Omada central site or MikroTik</small></div>
-  <div><span class="onboard-step">03</span><strong>WorldLink review</strong><small>Safe hardware verification</small></div>
-  <div><span class="onboard-step">04</span><strong>Go live</strong><small>After testing and approval</small></div></div>
-<div class="onboard-layout"><section class="panel"><div class="panel-heading"><div><h2>Device information</h2><p>For Omada, enter the model and serial shown on the TP-Link label. No VPN is needed with WorldLink central Omada.</p></div></div>
-  <form method="post" class="onboard-form">{% csrf_token %}
+<div class="onboard-progress"><div><span class="onboard-step">01</span><strong>{% t 'Register device' %}</strong><small>{% t 'Model and serial from its label' %}</small></div>
+  <div><span class="onboard-step">02</span><strong>{% t 'Connect network' %}</strong><small>{% t 'Omada central site or MikroTik' %}</small></div>
+  <div><span class="onboard-step">03</span><strong>{% t 'WorldLink review' %}</strong><small>{% t 'Safe hardware verification' %}</small></div>
+  <div><span class="onboard-step">04</span><strong>{% t 'Go live' %}</strong><small>{% t 'After testing and approval' %}</small></div></div>
+<div class="onboard-layout"><section class="panel"><div class="panel-heading"><div><h2>{% t 'Device information' %}</h2><p>{% t 'Enter the model and serial from the device label.' %}</p></div></div>
+  <form method="post" class="onboard-form" data-loading-form>{% csrf_token %}
     {% for field in form %}
-    {% if field.name == 'address' %}<details class="onboard-span" {% if form.family.value == 'MIKROTIK' %}open{% endif %}><summary>Advanced settings · MikroTik private management</summary><div class="onboard-advanced">{% endif %}
-    <div class="field {% if field.name == 'notes' %}onboard-span{% endif %}"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
-      {% if field.help_text %}<small class="field-hint">{{ field.help_text }}</small>{% endif %}
+    {% if field.name == 'address' %}<details class="onboard-span" {% if form.family.value == 'MIKROTIK' %}open{% endif %}><summary>{% t 'Advanced settings · MikroTik private management' %}</summary><div class="onboard-advanced">{% endif %}
+    <div class="field {% if field.name == 'notes' %}onboard-span{% endif %}"><label for="{{ field.id_for_label }}">{% t field.label %}</label>{{ field }}
+      {% if field.help_text %}<small class="field-hint">{% t field.help_text %}</small>{% endif %}
       {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}</div>
     {% if field.name == 'notes' %}</div></details>{% endif %}
     {% endfor %}
     {% if form.non_field_errors %}<div class="field-error onboard-span">{{ form.non_field_errors }}</div>{% endif %}
-    <div class="onboard-form-actions onboard-span"><button type="submit" class="button button-primary">Save and continue →</button></div>
+    <div class="onboard-form-actions onboard-span"><button type="submit" class="button button-primary">{% t 'Save and continue' %} →</button></div>
   </form></section>
-  <aside class="onboard-stack"><section class="panel"><div class="panel-heading"><div><h2>What happens next?</h2></div></div><ol class="router-steps">
-    <li><strong>TP-Link Omada:</strong> after saving, enter your AP MAC and Wi-Fi name on the setup page. WorldLink assigns your own central site.</li>
-    <li><strong>MikroTik:</strong> after saving, use the separate Connect &amp; sync screen for RouterOS. Advanced private access is never published to Wi-Fi guests.</li>
-    <li><strong>Payments:</strong> internet is never activated by saving a router. WorldLink must verify the hardware, merchant arrangement, and live payment permission.</li>
+  <aside class="onboard-stack"><section class="panel"><div class="panel-heading"><div><h2>{% t 'What happens next?' %}</h2></div></div><ol class="router-steps">
+    <li><strong>TP-Link Omada:</strong> {% t 'After saving, enter your AP MAC and Wi-Fi name. WorldLink assigns your site.' %}</li>
+    <li><strong>MikroTik:</strong> {% t 'Use the Connect and sync page after saving.' %}</li>
+    <li><strong>{% t 'Payments' %}:</strong> {% t 'WorldLink checks the device before approving voucher and EvPay access.' %}</li>
   </ol></section></aside></div>
 {% else %}
 <section class="panel form-panel"><form method="post" class="form-grid">{% csrf_token %}{% for field in form %}<div class="field {% if field.name == 'notes' %}span-2{% endif %}"><label for="{{ field.id_for_label }}">{% t field.label %}</label>{{ field }}{% if field.help_text %}<small class="field-hint">{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}</div>{% endfor %}{% if form.non_field_errors %}<div class="field-error">{{ form.non_field_errors }}</div>{% endif %}<div class="form-actions"><button type="submit" class="button button-primary">{% t 'Save' %}</button></div></form></section>

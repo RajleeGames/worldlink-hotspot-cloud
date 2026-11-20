@@ -2,11 +2,11 @@
 {% block content %}
 <div class="page-heading"><div><p class="eyebrow">{% t 'Account' %} / {% t 'Your business identity' %}</p><h1>{% t 'Business settings' %}</h1><p>{% t 'Manage business information' %}</p></div></div>
 <section class="panel settings-panel">
-  <form method="post" enctype="multipart/form-data" class="settings-form" data-loading-form>
+  <form method="post" enctype="multipart/form-data" class="settings-form" data-loading-form data-upload-progress>
     {% csrf_token %}
     <div class="settings-brand-row">
       <div class="settings-logo-preview" data-logo-preview>{% if active_company.logo %}<img src="{{ active_company.logo.url }}" alt="Company logo">{% else %}<span>{{ active_company.name|first|upper }}</span>{% endif %}</div>
-      <div class="settings-logo-copy"><h2>{% t 'Company logo' %}</h2><p>{% t 'Appears in your business workspace.' %} PNG/JPG/WebP · max 2 MB.</p>{{ form.logo }}{% for error in form.logo.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+      <div class="settings-logo-copy"><h2>{% t 'Company logo' %}</h2><p>{% t 'Upload a photo or logo. We resize it automatically.' %} PNG/JPG/WebP/GIF · {% t 'up to 15 MB' %}.</p>{{ form.logo }}{% for error in form.logo.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
     </div>
     <div class="settings-divider"></div>
     <div class="form-grid">

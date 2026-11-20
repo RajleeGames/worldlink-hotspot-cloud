@@ -6,8 +6,10 @@ are used. Tenant-provided URLs are never network destinations.
 """
 
 import json
+import ipaddress
 import re
 import ssl
+from datetime import timedelta
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, ProxyHandler, Request, build_opener
@@ -66,6 +68,7 @@ class OmadaReadOnlyClient:
     PAGE_SIZE = 50
     MAX_SITE_PAGES = 4
     MAX_DEVICE_PAGES = 10
+    MAX_CLIENT_PAGES = 20
 
     def __init__(self):
         parsed = urlsplit(settings.OMADA_CONTROLLER_URL)
@@ -223,6 +226,79 @@ class OmadaReadOnlyClient:
             return state, reported
         return OmadaDeviceObservation.State.NOT_FOUND, ''
 
+    def get_connected_clients(self, *, site_id):
+        """Use the official v1 read-only client list on a verified central site.
+
+        The API may not be granted to all tokens/controllers. In that case the
+        managed AP monitor still works, while client observations simply expire.
+        """
+        auth = self._authorization()
+        site_id = self._site_id(auth, requested_site_id=site_id)
+        return self._pages(f'sites/{site_id}/clients', auth, self.MAX_CLIENT_PAGES)
+
+
+def _client_rows_for_router(rows, router):
+    """Attribute clients only when the controller explicitly reports AP + SSID."""
+    profile = router.omada_onboarding
+    target_ap = normalize_mac(profile.ap_mac)
+    found = {}
+    for item in rows:
+        if item.get('active') is False:
+            continue
+        ap = item.get('apMac', item.get('apMacAddress'))
+        ssid = item.get('ssid', item.get('ssidName'))
+        try:
+            if normalize_mac(ap) != target_ap or ssid != profile.ssid_name:
+                continue
+            mac = normalize_mac(item.get('mac', item.get('clientMac', item.get('macAddress'))))
+        except ValueError:
+            continue
+        raw_ip = item.get('ip', item.get('ipAddress'))
+        try:
+            ip = str(ipaddress.ip_address(raw_ip))
+        except (ValueError, TypeError):
+            ip = None
+        device_type = item.get('deviceType', item.get('osType', ''))
+        if not isinstance(device_type, str):
+            device_type = ''
+        found[mac] = {'ip_address': ip, 'device_type': device_type[:80],
+                      'ssid_name': profile.ssid_name}
+    return found
+
+
+def _sync_managed_clients(client, routers, observations):
+    """Client inventory is best-effort, never a condition for AP approval.
+
+    One site-wide read per site. Only freshly observed, connected and reviewed
+    APs can receive sightings. Empty results leave old records offline after
+    their 120-second TTL; clients not returned are not refreshed.
+    """
+    from hotspots.models import OmadaClientObservation
+    active = [router for router, observation in zip(routers, observations)
+              if observation.state == OmadaDeviceObservation.State.CONNECTED and observation.is_fresh]
+    site_routers = {}
+    for router in active:
+        site_id = router.omada_onboarding.managed_site.openapi_site_id
+        site_routers.setdefault(site_id, []).append(router)
+    for site_id, assigned in site_routers.items():
+        try:
+            rows = client.get_connected_clients(site_id=site_id)
+        except OmadaMonitorError:
+            continue  # No fake live clients when permission/API is unavailable.
+        observed_at = timezone.now()
+        for router in assigned:
+            by_mac = _client_rows_for_router(rows, router)
+            for mac, details in by_mac.items():
+                OmadaClientObservation.objects.update_or_create(
+                    router=router, mac_address=mac,
+                    defaults={'company_id': router.company_id, 'observed_at': observed_at, **details},
+                )
+            # A successful full active-client read supersedes yesterday's
+            # sightings. Retain history but mark absent devices offline now.
+            OmadaClientObservation.objects.filter(router=router).exclude(
+                mac_address__in=by_mac,
+            ).update(observed_at=observed_at - timedelta(minutes=3))
+
 
 def poll_approved_pilot():
     router = approved_pilot_router()
@@ -284,4 +360,5 @@ def poll_approved_managed(limit=50):
             'state': state, 'reported_status': reported, 'checked_at': timezone.now(),
         })
         results.append(observation)
+    _sync_managed_clients(client, routers, results)
     return results

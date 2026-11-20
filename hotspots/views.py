@@ -12,6 +12,9 @@ from tenants.utils import require_tenant
 from networks.models import Router, WifiPlan
 from .forms import CustomerForm
 from .models import HotspotCustomer, HotspotSession
+from .omada_clients import live_omada_clients
+from payments.models import EvPayCollection
+from payments.collections import EARNING_STATUSES
 
 
 def filtered_sessions(request):
@@ -45,8 +48,18 @@ def sessions(request):
         'stale_count':base.filter(status='ACTIVE',source__in=('RADIUS','OMADA'),last_seen_at__lt=now-timedelta(minutes=5)).count(),
         'total_mb':round(((byte_totals['dl'] or 0)+(byte_totals['ul'] or 0))/1048576,1),
     }
+    router_id = request.GET.get('router', '')
+    live = live_omada_clients(company, query=request.GET.get('q', '').strip()[:120],
+                              router_id=int(router_id) if router_id.isdecimal() else None)
+    online_sessions = base.filter(HotspotSession.online_filter(now))
+    adapter_online = set(online_sessions.exclude(mac_address='')
+                         .values_list('router_id', 'mac_address'))
+    unidentified_count = online_sessions.filter(mac_address='').count()
+    omada_online = {(row['device'].router_id, row['device'].mac_address) for row in live}
+    stats['online_count'] = len(adapter_online | omada_online) + unidentified_count
     page=Paginator(filtered_sessions(request),25).get_page(request.GET.get('page'))
     return render(request,'hotspots/sessions.html',{'page_title':'Connected users','records':page,'stats':stats,
+        'live_clients':live,
         'routers':Router.objects.filter(company=company).order_by('name'), 'plans':WifiPlan.objects.filter(company=company).order_by('name'),
         'filter_q':request.GET.get('q',''),'filter_state':request.GET.get('state','all'),
         'filter_router':request.GET.get('router',''),'filter_plan':request.GET.get('plan',''),
@@ -80,7 +93,14 @@ def customers(request):
     q=request.GET.get('q','').strip()[:120]
     if q: qs=qs.filter(Q(full_name__icontains=q)|Q(phone__icontains=q)|Q(email__icontains=q))
     page=Paginator(qs,25).get_page(request.GET.get('page'))
-    return render(request,'hotspots/customers.html',{'page_title':'Wi-Fi customers','records':page,'filter_q':q,'customer_count':HotspotCustomer.objects.filter(company=request.active_company).count()})
+    payments=EvPayCollection.objects.filter(
+        company=request.active_company,status__in=EARNING_STATUSES,confirmed_at__isnull=False,
+    ).order_by('-confirmed_at')
+    if q:
+        payments=payments.filter(Q(customer_name__icontains=q)|Q(phone__icontains=q)|Q(client_mac__icontains=q))
+    return render(request,'hotspots/customers.html',{'page_title':'Wi-Fi customers','records':page,'filter_q':q,
+        'customer_count':HotspotCustomer.objects.filter(company=request.active_company).count(),
+        'paid_customers':payments[:50], 'payment_customer_count':payments.count()})
 
 
 @require_tenant()

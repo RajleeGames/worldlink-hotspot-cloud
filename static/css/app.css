@@ -1167,3 +1167,29 @@ html[data-theme="dark"]{
   .sale-summary{padding:17px 16px}
   .sale-form .button{width:100%}
 }
+
+/* Polished, consistently light borders; dark mode keeps theme variables. */
+:where(.panel,.stat-card,.wallet-metric,.guest-plan,.guest-info,.onboard-progress>div){border-color:var(--border);box-shadow:0 2px 14px rgba(20,40,61,.025)}
+:where(.input,.file-input,.guest-form input,.guest-form select){border-color:var(--border-strong);border-radius:9px}
+:where(.input,.file-input,.guest-form input,.guest-form select):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.report-source-filter{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:3px 0 18px}
+.report-source-filter label{font-size:12px;font-weight:600;color:var(--ink-soft)}
+.report-source-filter .input{min-width:210px;max-width:290px;min-height:42px}
+.report-source-filter .button{min-height:42px}
+.report-summary-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.stat-link{text-decoration:none;color:inherit;display:block}
+.stat-link:hover{border-color:var(--accent)}
+.whc-form-feedback{display:flex;align-items:center;gap:11px;padding:10px 12px;margin:10px 0 0;background:var(--surface-2,#eef7fa);border:1px solid var(--border,#dce5ec);border-radius:10px;color:var(--ink,#153246);font-size:12px;font-weight:600;min-width:0}
+.whc-form-feedback[hidden]{display:none!important}
+.whc-form-feedback progress{appearance:none;-webkit-appearance:none;width:84px;max-width:30%;height:7px;border:0;border-radius:99px;overflow:hidden;background:var(--border,#d9e4eb);flex:none}
+.whc-form-feedback progress[hidden]{display:none}
+.whc-form-feedback progress::-webkit-progress-bar{background:var(--border,#d9e4eb);border-radius:99px}
+.whc-form-feedback progress::-webkit-progress-value{background:var(--accent,#167a88);border-radius:99px;transition:width .15s}
+.whc-form-feedback progress::-moz-progress-bar{background:var(--accent,#167a88);border-radius:99px}
+.whc-form-feedback-label{overflow-wrap:anywhere}
+.guest-body .whc-form-feedback{font-size:13px;margin-top:12px}
+button.is-submitting{opacity:.75;cursor:progress!important;pointer-events:none}
+button.is-submitting::before{content:'';display:inline-block;width:13px;height:13px;vertical-align:middle;margin-right:8px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:whc-spin .75s linear infinite}
+@keyframes whc-spin{to{transform:rotate(360deg)}}
+@media(max-width:980px){.report-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.report-source-filter{display:grid;grid-template-columns:1fr}.report-source-filter .input,.report-source-filter .button{max-width:none;width:100%}.report-summary-grid{gap:8px}.report-summary-grid .stat-card{min-width:0}.report-summary-grid .money{font-size:clamp(15px,4.4vw,20px);overflow-wrap:anywhere}}

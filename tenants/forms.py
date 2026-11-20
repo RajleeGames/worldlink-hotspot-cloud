@@ -1,7 +1,8 @@
 from django import forms
+from cloud.logo_upload import LogoUploadFormMixin
 from .models import Company
 
-class CompanyForm(forms.ModelForm):
+class CompanyForm(LogoUploadFormMixin, forms.ModelForm):
     class Meta:
         model = Company
         fields = ['name', 'email', 'phone', 'city', 'logo']

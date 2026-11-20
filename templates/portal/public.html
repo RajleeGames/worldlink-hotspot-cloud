@@ -21,7 +21,7 @@
   <section class="guest-info guest-voucher-card"><div class="guest-minor-icon">#</div><div class="guest-voucher-content"><h3>{{ w.voucher }}</h3>
     {% if voucher_available %}
     <p>{{ w.voucher_note_active }}</p>
-    <form method="post" action="{% url 'portal:voucher_redeem' company.slug %}" class="guest-voucher-form">
+    <form method="post" action="{% url 'portal:voucher_redeem' company.slug %}" class="guest-voucher-form" data-loading-form data-processing-label="{% if lang == 'sw' %}Tunahakiki vocha…{% else %}Verifying voucher…{% endif %}">
       {% csrf_token %}<input type="hidden" name="lang" value="{{ lang }}">
       <label class="guest-label" for="voucher-code">{{ w.voucher_code }}</label>
       <input id="voucher-code" name="code" class="input guest-voucher-input" type="text" maxlength="24" required autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="WHC-XXXXXXXXXX">

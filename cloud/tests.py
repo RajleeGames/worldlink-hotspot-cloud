@@ -116,6 +116,36 @@ class BrandingTests(TestCase):
             self.company.refresh_from_db()
             self.assertTrue(self.company.logo.name.startswith('branding/businesses/'))
 
+    def test_large_logo_automatically_fits_square_canvas(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.test import override_settings
+        from PIL import Image
+        from io import BytesIO
+        import tempfile
+        image = BytesIO()
+        Image.new('RGB', (2800, 1350), 'teal').save(image, format='PNG')
+        self.client.force_login(self.owner)
+        with tempfile.TemporaryDirectory() as temp, override_settings(MEDIA_ROOT=temp):
+            response = self.client.post(reverse('tenants:settings'), {
+                'name': self.company.name, 'email': '', 'phone': '', 'city': '',
+                'logo': SimpleUploadedFile('large.png', image.getvalue(), content_type='image/png'),
+            })
+            self.assertEqual(response.status_code, 302)
+            self.company.refresh_from_db()
+            with Image.open(self.company.logo.path) as saved:
+                self.assertEqual(saved.size, (512, 512))
+                self.assertEqual(saved.format, 'PNG')
+
+    def test_upload_is_rejected_if_not_an_image(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_login(self.owner)
+        response = self.client.post(reverse('tenants:settings'), {
+            'name': self.company.name, 'email': '', 'phone': '', 'city': '',
+            'logo': SimpleUploadedFile('fake.svg', b'<svg/>', content_type='image/svg+xml'),
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Company.objects.get(pk=self.company.pk).logo)
+
 
 class WorkspaceCrudTests(TestCase):
     def setUp(self):

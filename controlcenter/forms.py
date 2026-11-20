@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import SetPasswordForm
 from tenants.models import Company, Membership
 from cloud.models import PlatformBranding
+from cloud.logo_upload import LogoUploadFormMixin
 
 User = get_user_model()
 
@@ -91,7 +92,7 @@ class MembershipAddForm(forms.Form):
         return email
 
 
-class BrandingForm(forms.ModelForm):
+class BrandingForm(LogoUploadFormMixin, forms.ModelForm):
     class Meta:
         model = PlatformBranding
         fields = ['name', 'product_name', 'tagline', 'logo']

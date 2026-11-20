@@ -242,6 +242,7 @@
     }));
     document.querySelectorAll('form').forEach(form => form.addEventListener('submit', () => {
       if (!form.checkValidity()) return;
+      if (form.matches('[data-upload-progress]') && [...form.querySelectorAll('input[type="file"]')].some(el => el.files?.length)) return;
       showLoader();
     }));
   }
@@ -268,10 +269,8 @@
     };
     reader.readAsDataURL(file);
   }));
-  document.querySelectorAll('[data-loading-form]').forEach(form => form.addEventListener('submit', () => {
-    const button = form.querySelector('button[type="submit"]');
-    if (button) button.classList.add('is-submitting');
-  }));
+  // Submission locking and actual upload progress live in progress.js, shared
+  // with the iPhone/Android captive portal (which doesn't load app.js).
 })();
 
 /* v0.5 · Countdown display only, not an authentication signal. */
