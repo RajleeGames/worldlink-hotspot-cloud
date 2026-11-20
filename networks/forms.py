@@ -1,5 +1,9 @@
+import ipaddress
+import re
+from urllib.parse import urlsplit
+
 from django import forms
-from .models import Location, Router, WifiPlan
+from .models import Location, OmadaOnboarding, Router, WifiPlan
 
 class BaseStyledForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
@@ -31,6 +35,10 @@ class RouterForm(BaseStyledForm):
     def __init__(self, *args, company, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['location'].queryset = Location.objects.filter(company=company).order_by('name')
+        self.fields['address'].help_text = ('MikroTik only: private LAN/VPN management IP. '
+                                            'For Omada, leave this empty and use the Omada setup page.')
+        self.fields['management_port'].help_text = ('MikroTik HTTPS REST port, normally 443. '
+                                                     'Omada HTTPS controller URL is configured separately.')
         if not self.fields['location'].queryset.exists():
             self.fields['location'].required = False
             self.fields['location'].help_text = 'A "Main site" location will be created when you save.'
@@ -59,6 +67,75 @@ class MikroTikLoginForm(forms.Form):
         for field in self.fields.values():
             if not isinstance(field.widget, forms.CheckboxInput):
                 field.widget.attrs['class'] = 'input'
+
+
+class OmadaOnboardingForm(BaseStyledForm):
+    """Captures safe connection metadata, never hotspot credentials."""
+
+    class Meta:
+        model = OmadaOnboarding
+        fields = ['connection_mode', 'controller_origin', 'controller_id', 'ap_mac', 'ssid_name', 'setup_notes']
+
+    def __init__(self, *args, submit=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.submit = submit
+
+    def clean_controller_origin(self):
+        value = self.cleaned_data['controller_origin'].strip()
+        if not value:
+            return ''
+        try:
+            parts = urlsplit(value)
+            if (parts.scheme != 'https' or not parts.hostname or parts.username or parts.password
+                    or parts.path not in ('', '/') or parts.query or parts.fragment
+                    or not 1 <= (parts.port or 443) <= 65535):
+                raise ValueError('not an HTTPS origin')
+        except ValueError:
+            raise forms.ValidationError('Enter an HTTPS origin only, for example https://my-controller.example.ts.net (no path or login).')
+        if parts.hostname.lower() == 'localhost':
+            raise forms.ValidationError('localhost points to the server itself. Use your private VPN controller address instead.')
+        try:
+            ip = ipaddress.ip_address(parts.hostname)
+        except ValueError:
+            pass
+        else:
+            if ip.is_loopback or ip.is_link_local or ip.is_unspecified or ip.is_multicast:
+                raise forms.ValidationError('A local-only or non-routable controller address cannot reach WorldLink. Use private VPN access.')
+        return value.rstrip('/')
+
+    def clean_controller_id(self):
+        value = self.cleaned_data['controller_id'].strip()
+        if value and not re.fullmatch(r'[A-Za-z0-9_-]{10,80}', value):
+            raise forms.ValidationError('Enter a controller ID of 10–80 letters, numbers, underscores or hyphens.')
+        return value
+
+    def clean_ap_mac(self):
+        value = self.cleaned_data['ap_mac'].strip()
+        if not value:
+            return ''
+        if not re.fullmatch(r'(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}', value):
+            raise forms.ValidationError('Enter a valid AP MAC, for example B8-FB-B3-79-B5-60.')
+        return value.upper().replace(':', '-')
+
+    def clean_ssid_name(self):
+        return self.cleaned_data['ssid_name'].strip()
+
+    def clean_setup_notes(self):
+        value = self.cleaned_data['setup_notes'].strip()
+        if re.search(r'\b(?:password|api[_ -]?key|client[_ -]?secret|token)\s*[:=]\s*\S+', value, re.I):
+            raise forms.ValidationError('Remove credentials or tokens from your notes. WorldLink will arrange a secure handoff.')
+        return value
+
+    def clean(self):
+        data = super().clean()
+        if self.submit:
+            if data.get('connection_mode') == OmadaOnboarding.ConnectionMode.VPN:
+                for name in ('controller_origin', 'controller_id', 'ap_mac', 'ssid_name'):
+                    if not data.get(name):
+                        self.add_error(name, 'Required for a private controller connection request.')
+            elif not data.get('setup_notes') and not data.get('ssid_name'):
+                self.add_error('setup_notes', 'Describe your router or Wi-Fi setup so WorldLink can help you.')
+        return data
 
 class WifiPlanForm(BaseStyledForm):
     class Meta:

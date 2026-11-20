@@ -40,6 +40,44 @@ class Router(models.Model):
     def __str__(self):
         return self.name
 
+
+class OmadaOnboarding(models.Model):
+    """Per-router setup request. Never grants access to a controller by itself.
+
+    Credentials are deliberately not stored here. Only the already-approved
+    single-company pilot in payments.omada can authorize paid clients.
+    """
+
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        SUBMITTED = 'SUBMITTED', 'Awaiting WorldLink review'
+        NEEDS_INFO = 'NEEDS_INFO', 'More information needed'
+        REVIEWED = 'REVIEWED', 'Details reviewed — connection pending'
+
+    class ConnectionMode(models.TextChoices):
+        VPN = 'VPN', 'I have a private HTTPS/VPN controller address'
+        ASSISTED = 'ASSISTED', 'Help me connect my controller securely'
+
+    router = models.OneToOneField(Router, on_delete=models.CASCADE, related_name='omada_onboarding')
+    connection_mode = models.CharField(max_length=12, choices=ConnectionMode.choices, default=ConnectionMode.ASSISTED)
+    controller_origin = models.URLField(max_length=255, blank=True, help_text='HTTPS VPN origin only, no /hotspot.html, credentials, or public port forwarding.')
+    controller_id = models.CharField(max_length=80, blank=True, help_text='Copy only the omadacId value from Omada’s URL, not the entire URL or a password.')
+    ap_mac = models.CharField(max_length=17, blank=True, help_text='Access point MAC, for example B8-FB-B3-79-B5-60.')
+    ssid_name = models.CharField(max_length=64, blank=True, help_text='Exact guest Wi-Fi name, including capitalization.')
+    setup_notes = models.TextField(blank=True, help_text='Optional details for WorldLink. Never include router or operator passwords.')
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.DRAFT)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    review_note = models.CharField(max_length=400, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f'{self.router.name}: {self.get_status_display()}'
+
 class WifiPlan(models.Model):
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='wifi_plans')
     name = models.CharField(max_length=120)

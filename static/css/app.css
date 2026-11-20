@@ -1016,4 +1016,7 @@ html[data-theme="dark"] {
 .router-notice{margin:0 18px 18px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);padding:13px 15px;font-size:10.5px;line-height:1.65;color:var(--ink-soft)}
 .router-notice strong{color:var(--ink)}
 .router-notice code{font-size:10px;overflow-wrap:anywhere}
+.router-review-form{display:grid;gap:8px;min-width:180px;max-width:280px}
+.router-review-form label{font-size:10px;color:var(--ink-soft)}
+.router-review-form .row-actions{display:flex;flex-wrap:wrap;gap:6px}
 @media(max-width:650px){.router-connect-form{grid-template-columns:1fr;padding:14px}.router-connect-form .form-actions .button{flex:1;min-width:150px}.router-steps{padding:0 16px 12px 30px}}

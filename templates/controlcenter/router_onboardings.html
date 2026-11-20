@@ -1,0 +1,43 @@
+{% extends 'base.html' %}{% load translations %}
+{% block content %}
+<div class="page-heading">
+  <div><p class="eyebrow">WORLDLINK · NETWORK OPERATIONS</p><h1>Omada onboarding requests</h1>
+    <p>Review customer-provided details before arranging private access and hardware tests.</p></div>
+  <a class="button button-secondary" href="{% url 'controlcenter:overview' %}">← Control Center</a>
+</div>
+<div class="integration-notice important">
+  A reviewed request is not a connected router. This screen does not log in to a controller, store passwords,
+  modify payment permissions, or enable internet activation.
+</div>
+<section class="panel">
+  <div class="table-wrap"><table class="data-table"><thead><tr>
+    <th>Business / router</th><th>Wi-Fi details</th><th>Connection request</th><th>Status</th><th>WorldLink review</th>
+  </tr></thead><tbody>
+    {% for item in records %}
+    <tr>
+      <td><strong>{{ item.router.company.name }}</strong><small class="cell-sub">{{ item.router.name }} · {{ item.router.location.name }}</small></td>
+      <td><strong>{{ item.ssid_name|default:'SSID not provided' }}</strong><small class="cell-sub mono">AP {{ item.ap_mac|default:'Not provided' }}</small><small class="cell-sub">Controller ID: {{ item.controller_id|default:'Not provided' }}</small></td>
+      <td>{{ item.get_connection_mode_display }}<small class="cell-sub">{{ item.controller_origin|default:'URL not provided' }}</small>
+        {% if item.setup_notes %}<small class="cell-sub">Customer note: {{ item.setup_notes|truncatechars:180 }}</small>{% endif %}</td>
+      <td><span class="pill pending">{{ item.get_status_display }}</span><small class="cell-sub">{{ item.updated_at|date:'d M Y H:i' }}</small>
+        {% if item.review_note %}<small class="cell-sub">Staff note: {{ item.review_note }}</small>{% endif %}</td>
+      <td>
+        {% if can_manage_platform and item.status == 'SUBMITTED' %}
+        <form method="post" action="{% url 'controlcenter:review_router_onboarding' item.pk %}" class="router-review-form">{% csrf_token %}
+          <label for="review-note-{{ item.pk }}">Response (no passwords)</label>
+          <input id="review-note-{{ item.pk }}" class="input" type="text" name="note" maxlength="400" placeholder="Optional if reviewed">
+          <div class="row-actions"><button type="submit" class="action-button" name="decision" value="needs_info">Request details</button>
+          <button type="submit" class="action-button" name="decision" value="reviewed">Mark reviewed</button></div>
+        </form>
+        {% else %}—{% endif %}
+      </td>
+    </tr>
+    {% empty %}<tr><td class="empty-cell" colspan="5">No Omada onboarding requests yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% if records.has_other_pages %}<div class="pagination">
+  {% if records.has_previous %}<a class="button button-secondary" href="?page={{ records.previous_page_number }}">← Previous</a>{% endif %}
+  <span>Page {{ records.number }} of {{ records.paginator.num_pages }}</span>
+  {% if records.has_next %}<a class="button button-secondary" href="?page={{ records.next_page_number }}">Next →</a>{% endif %}
+</div>{% endif %}
+{% endblock %}

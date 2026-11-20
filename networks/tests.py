@@ -9,7 +9,7 @@ from django.urls import reverse
 from tenants.models import Company, Membership
 from vouchers.models import Voucher, VoucherBatch, ManualSale
 from .mikrotik import MikroTikClient, RouterConnectionError
-from .models import Location, Router, RouterVoucherSync, WifiPlan
+from .models import Location, OmadaOnboarding, Router, RouterVoucherSync, WifiPlan
 
 User = get_user_model()
 ALLOWED = (ipaddress.ip_network("192.168.88.1/32"),)
@@ -201,3 +201,169 @@ class RouterPilotTests(TestCase):
         self.assertContains(response, "No enabled MikroTik HotSpot server")
         self.assertEqual(posts, [])
         self.assertEqual(RouterVoucherSync.objects.count(), 0)
+
+
+class OmadaOnboardingTests(TestCase):
+    """Multiple tenants can submit metadata, but cannot enable live connectivity."""
+
+    def setUp(self):
+        self.company = Company.objects.create(name='Omada Customer')
+        self.other_company = Company.objects.create(name='Other Omada Customer')
+        self.owner = User.objects.create_user(username='omada-owner@example.com', password='a-test-password')
+        self.other = User.objects.create_user(username='other-owner@example.com', password='a-test-password')
+        self.staff = User.objects.create_superuser(username='platform-admin@example.com', password='a-test-password')
+        Membership.objects.create(user=self.owner, company=self.company, role='OWNER')
+        Membership.objects.create(user=self.other, company=self.other_company, role='OWNER')
+        self.router = Router.objects.create(
+            company=self.company,
+            location=Location.objects.create(company=self.company, name='Site A'),
+            name='Omada EAP', family=Router.Family.OMADA,
+        )
+        self.url = reverse('networks:omada_onboarding', args=[self.router.pk])
+
+    def vpn_payload(self, **changes):
+        data = {
+            'action': 'submit', 'connection_mode': 'VPN',
+            'controller_origin': 'https://my-controller.tail123.ts.net/',
+            'controller_id': 'testControllerId0123456789abcdefgh',
+            'ap_mac': 'b8:fb:b3:79:b5:60', 'ssid_name': 'GUEST-WIFI', 'setup_notes': '',
+        }
+        data.update(changes)
+        return data
+
+    def test_new_omada_router_can_request_review_without_credentials(self):
+        self.client.force_login(self.owner)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+        self.assertEqual(OmadaOnboarding.objects.count(), 0)  # GET never mutates DB
+        response = self.client.post(self.url, self.vpn_payload())
+        self.assertRedirects(response, self.url)
+        profile = OmadaOnboarding.objects.get(router=self.router)
+        self.assertEqual(profile.status, OmadaOnboarding.Status.SUBMITTED)
+        self.assertIsNotNone(profile.submitted_at)
+        self.assertEqual(profile.ap_mac, 'B8-FB-B3-79-B5-60')
+        self.assertEqual(profile.controller_origin, 'https://my-controller.tail123.ts.net')
+        self.assertNotIn('password', [f.name for f in profile._meta.fields])
+        self.assertNotIn('api_key', [f.name for f in profile._meta.fields])
+        self.assertContains(self.client.get(reverse('networks:routers')), 'Awaiting WorldLink review')
+
+    def test_assisted_customer_can_send_details_without_private_vpn_yet(self):
+        self.client.force_login(self.owner)
+        data = self.vpn_payload(connection_mode='ASSISTED', controller_origin='', controller_id='',
+                                ap_mac='', ssid_name='', setup_notes='Need help getting a private VPN.')
+        self.assertRedirects(self.client.post(self.url, data), self.url)
+        self.assertEqual(OmadaOnboarding.objects.get(router=self.router).status, OmadaOnboarding.Status.SUBMITTED)
+
+    def test_save_draft_does_not_request_connection(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(self.url, {
+            'action': 'save', 'connection_mode': 'ASSISTED', 'controller_origin': '',
+            'controller_id': '', 'ap_mac': '', 'ssid_name': '', 'setup_notes': '',
+        })
+        self.assertRedirects(response, self.url)
+        self.assertEqual(OmadaOnboarding.objects.get(router=self.router).status, OmadaOnboarding.Status.DRAFT)
+
+    def test_origin_and_mac_input_are_validated_and_status_cannot_be_forged(self):
+        self.client.force_login(self.owner)
+        for url in ('http://my-controller.ts.net', 'https://user:pass@my-controller.ts.net',
+                    'https://my-controller.ts.net/hotspot.html', 'https://my-controller.ts.net/?token=secret'):
+            response = self.client.post(self.url, self.vpn_payload(controller_origin=url))
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'Enter an HTTPS origin only')
+        for url in ('https://localhost:8043', 'https://127.0.0.1:8043'):
+            response = self.client.post(self.url, self.vpn_payload(controller_origin=url))
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'controller address')
+        response = self.client.post(self.url, self.vpn_payload(ap_mac='bad-mac'))
+        self.assertContains(response, 'Enter a valid AP MAC')
+        response = self.client.post(self.url, self.vpn_payload(setup_notes='password=oops'))
+        self.assertContains(response, 'Remove credentials or tokens')
+        self.assertFalse(OmadaOnboarding.objects.exists())
+        self.assertRedirects(
+            self.client.post(self.url, self.vpn_payload(status='REVIEWED', reviewed_by=self.staff.pk)),
+            self.url,
+        )
+        self.assertEqual(OmadaOnboarding.objects.get().status, OmadaOnboarding.Status.SUBMITTED)
+
+    def test_customer_dashboard_shows_own_router_and_setup_state_not_another_company(self):
+        second = Router.objects.create(
+            company=self.other_company,
+            location=Location.objects.create(company=self.other_company, name='Remote location'),
+            name='SECRET-OTHER-TENANT-ROUTER', family=Router.Family.OMADA,
+        )
+        OmadaOnboarding.objects.create(
+            router=second, status=OmadaOnboarding.Status.REVIEWED,
+            controller_id='should-not-display-other-tenant-id',
+        )
+        self.client.force_login(self.owner)
+        dashboard_url = reverse('cloud:dashboard')
+        response = self.client.get(dashboard_url)
+        self.assertContains(response, 'Omada EAP')
+        self.assertContains(response, 'Added · setup needed')
+        self.assertNotContains(response, 'SECRET-OTHER-TENANT-ROUTER')
+        self.assertNotContains(response, 'should-not-display-other-tenant-id')
+        self.client.post(self.url, self.vpn_payload())
+        response = self.client.get(dashboard_url)
+        self.assertContains(response, 'Awaiting WorldLink review')
+        self.assertContains(response, 'testControllerId0123456789abcdefgh')
+        self.assertContains(response, '1 Omada access points registered')
+        self.assertContains(response, '1 awaiting review')
+
+    def test_tenant_isolation_viewer_denial_and_mikrotik_exclusion(self):
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.get(self.url).status_code, 404)
+        self.assertEqual(self.client.post(self.url, self.vpn_payload()).status_code, 404)
+        self.assertFalse(OmadaOnboarding.objects.exists())
+        self.client.force_login(self.owner)
+        Membership.objects.filter(user=self.owner).update(role='VIEWER')
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.assertEqual(self.client.post(self.url, self.vpn_payload()).status_code, 403)
+        Membership.objects.filter(user=self.owner).update(role='OWNER')
+        mikrotik = Router.objects.create(company=self.company, location=self.router.location,
+                                        name='Other model', family=Router.Family.MIKROTIK)
+        self.assertEqual(self.client.get(reverse('networks:omada_onboarding', args=[mikrotik.pk])).status_code, 404)
+
+    def test_staff_review_and_resubmission_do_not_activate_live_service(self):
+        self.client.force_login(self.owner)
+        self.assertRedirects(self.client.post(self.url, self.vpn_payload()), self.url)
+        profile = OmadaOnboarding.objects.get(router=self.router)
+        review_url = reverse('controlcenter:review_router_onboarding', args=[profile.pk])
+        self.assertEqual(self.client.get(reverse('controlcenter:router_onboardings')).status_code, 403)
+        self.assertEqual(self.client.post(review_url, {'decision': 'reviewed'}).status_code, 403)
+        self.client.force_login(self.staff)
+        self.assertContains(self.client.get(reverse('controlcenter:router_onboardings')), 'Omada Customer')
+        self.assertEqual(self.client.get(review_url).status_code, 405)
+        self.assertRedirects(self.client.post(review_url, {'decision': 'needs_info', 'note': 'Need VPN details.'}),
+                             reverse('controlcenter:router_onboardings'))
+        profile.refresh_from_db()
+        self.assertEqual(profile.status, OmadaOnboarding.Status.NEEDS_INFO)
+        self.assertEqual(profile.review_note, 'Need VPN details.')
+        self.client.force_login(self.owner)
+        self.assertContains(self.client.get(self.url), 'Need VPN details.')
+        self.assertRedirects(self.client.post(self.url, self.vpn_payload()), self.url)
+        profile.refresh_from_db()
+        self.assertEqual(profile.status, OmadaOnboarding.Status.SUBMITTED)
+        self.assertEqual(profile.review_note, '')
+        self.client.force_login(self.staff)
+        self.assertRedirects(self.client.post(review_url, {'decision': 'reviewed'}),
+                             reverse('controlcenter:router_onboardings'))
+        profile.refresh_from_db()
+        self.assertEqual(profile.status, OmadaOnboarding.Status.REVIEWED)
+        self.assertIsNone(self.router.last_checked_at)
+        self.assertEqual(RouterVoucherSync.objects.count(), 0)
+
+    def test_staff_does_not_approve_drafts_or_accept_unbounded_notes(self):
+        self.client.force_login(self.owner)
+        self.client.post(self.url, self.vpn_payload(action='save'))
+        profile = OmadaOnboarding.objects.get(router=self.router)
+        review_url = reverse('controlcenter:review_router_onboarding', args=[profile.pk])
+        self.client.force_login(self.staff)
+        self.client.post(review_url, {'decision': 'reviewed'})
+        profile.refresh_from_db()
+        self.assertEqual(profile.status, OmadaOnboarding.Status.DRAFT)
+        self.client.force_login(self.owner)
+        self.client.post(self.url, self.vpn_payload())
+        self.client.force_login(self.staff)
+        self.client.post(review_url, {'decision': 'needs_info', 'note': ''})
+        self.client.post(review_url, {'decision': 'reviewed', 'note': 'x' * 401})
+        profile.refresh_from_db()
+        self.assertEqual(profile.status, OmadaOnboarding.Status.SUBMITTED)

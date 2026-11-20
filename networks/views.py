@@ -8,13 +8,13 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 from tenants.utils import require_tenant
 from vouchers.models import Voucher
-from .models import Location, Router, RouterVoucherSync, WifiPlan
-from .forms import LocationForm, MikroTikLoginForm, RouterForm, WifiPlanForm
+from .models import Location, OmadaOnboarding, Router, RouterVoucherSync, WifiPlan
+from .forms import LocationForm, MikroTikLoginForm, OmadaOnboardingForm, RouterForm, WifiPlanForm
 from .mikrotik import MikroTikClient, RouterConnectionError
 
 @require_tenant()
 def router_list(request):
-    routers = Router.objects.filter(company=request.active_company).select_related('location').annotate(
+    routers = Router.objects.filter(company=request.active_company).select_related('location', 'omada_onboarding').annotate(
         synced_vouchers=Count('voucher_syncs')
     )
     return render(request, 'networks/routers.html', {'routers': routers, 'page_title': 'Routers'})
@@ -31,7 +31,10 @@ def router_edit(request, pk=None):
                 company=request.active_company, name='Main site',
             )
         router.save()
-        messages.success(request, 'Router saved. Use Connect & sync to test a MikroTik gateway.')
+        if router.family == Router.Family.OMADA:
+            messages.success(request, 'Router saved. Complete its Omada setup request next.')
+            return redirect('networks:omada_onboarding', pk=router.pk)
+        messages.success(request, 'Router saved. For MikroTik, use Connect & sync to test the gateway.')
         return redirect('networks:routers')
     return render(request,'networks/form.html',{'form':form,'page_title':'Edit router' if obj else 'Add router','form_type':'router'})
 
@@ -89,6 +92,42 @@ def router_connect(request, pk):
         'unsynced_sold': sold, 'synced_count': RouterVoucherSync.objects.filter(router=router).count(),
         'online_users': online_users, 'online_total': online_total,
         'page_title': 'Connect MikroTik',
+    })
+    response['Referrer-Policy'] = 'no-referrer'
+    response['Cache-Control'] = 'private, no-store'
+    return response
+
+
+@require_tenant('OWNER', 'MANAGER', 'TECHNICIAN')
+@never_cache
+def omada_onboarding(request, pk):
+    router = get_object_or_404(Router, pk=pk, company=request.active_company, family=Router.Family.OMADA)
+    saved_profile = OmadaOnboarding.objects.filter(router=router).first()
+    profile = saved_profile or OmadaOnboarding(router=router)
+    action = request.POST.get('action') if request.method == 'POST' else None
+    form = OmadaOnboardingForm(
+        request.POST or None, instance=profile, submit=(action == 'submit'),
+    )
+    if request.method == 'POST':
+        if action not in ('save', 'submit'):
+            form.add_error(None, 'Choose Save draft or Request WorldLink review.')
+        elif form.is_valid():
+            profile = form.save(commit=False)
+            profile.router = router
+            profile.status = (OmadaOnboarding.Status.SUBMITTED if action == 'submit'
+                              else OmadaOnboarding.Status.DRAFT)
+            profile.submitted_at = timezone.now() if action == 'submit' else None
+            profile.reviewed_at = None
+            profile.reviewed_by = None
+            profile.review_note = ''
+            profile.save()
+            messages.success(request, 'Omada setup request sent to WorldLink for review.' if action == 'submit'
+                             else 'Omada setup draft saved. No controller settings were changed.')
+            return redirect('networks:omada_onboarding', pk=router.pk)
+
+    response = render(request, 'networks/omada_onboarding.html', {
+        'router': router, 'profile': saved_profile, 'form': form,
+        'page_title': f'Connect {router.name} · Omada',
     })
     response['Referrer-Policy'] = 'no-referrer'
     response['Cache-Control'] = 'private, no-store'

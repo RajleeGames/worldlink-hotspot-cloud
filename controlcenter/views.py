@@ -11,7 +11,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from tenants.models import Company, Membership
-from networks.models import Router, WifiPlan
+from networks.models import OmadaOnboarding, Router, WifiPlan
 from vouchers.models import Voucher, ManualSale
 from hotspots.models import HotspotSession, HotspotCustomer
 from .auth import platform_required, platform_can_manage
@@ -39,8 +39,55 @@ def overview(request):
         'sales_sum':ManualSale.objects.aggregate(total=Sum('amount'))['total'] or 0,
         'pending_withdrawals':WithdrawalRequest.objects.filter(status__in=['REQUESTED','PROCESSING']).count(),
         'pending_receiving_numbers':WithdrawalDestination.objects.filter(status='PENDING').count(),
+        'pending_router_reviews':OmadaOnboarding.objects.filter(status=OmadaOnboarding.Status.SUBMITTED).count(),
         'recent_businesses':recent_businesses,'latest_audits':latest_audits,
         'can_manage_platform':platform_can_manage(request.user)})
+
+
+@platform_required()
+def router_onboardings(request):
+    """WorldLink-only intake queue; does not connect to customer hardware."""
+    records = OmadaOnboarding.objects.filter(router__family=Router.Family.OMADA).select_related(
+        'router__company', 'router__location', 'reviewed_by',
+    ).order_by('-updated_at')
+    return render(request, 'controlcenter/router_onboardings.html', {
+        'page_title': 'Omada router requests',
+        'records': Paginator(records, 30).get_page(request.GET.get('page')),
+        'can_manage_platform': platform_can_manage(request.user),
+    })
+
+
+@platform_required(manage=True)
+@require_POST
+@transaction.atomic
+def review_router_onboarding(request, pk):
+    profile = get_object_or_404(
+        OmadaOnboarding.objects.select_for_update().select_related('router__company'), pk=pk,
+        router__family=Router.Family.OMADA,
+    )
+    if profile.status != OmadaOnboarding.Status.SUBMITTED:
+        messages.error(request, 'Only newly submitted requests can be reviewed.')
+        return redirect('controlcenter:router_onboardings')
+    action = request.POST.get('decision')
+    if action not in ('needs_info', 'reviewed'):
+        messages.error(request, 'Choose an allowed review decision.')
+        return redirect('controlcenter:router_onboardings')
+    note = request.POST.get('note', '').strip()
+    if len(note) > 400 or (action == 'needs_info' and not note):
+        messages.error(request, 'A request for more information needs a note (max 400 characters).')
+        return redirect('controlcenter:router_onboardings')
+    profile.status = (OmadaOnboarding.Status.NEEDS_INFO if action == 'needs_info'
+                      else OmadaOnboarding.Status.REVIEWED)
+    profile.review_note = note
+    profile.reviewed_by = request.user
+    profile.reviewed_at = timezone.now()
+    profile.save(update_fields=['status', 'review_note', 'reviewed_by', 'reviewed_at', 'updated_at'])
+    PlatformAudit.objects.create(
+        actor=request.user, company=profile.router.company, action='OMADA_INTAKE_REVIEWED',
+        note=f'Router #{profile.router_id}; decision {profile.status}; request #{profile.pk}.',
+    )
+    messages.success(request, 'Setup request reviewed. No router or payment settings were changed.')
+    return redirect('controlcenter:router_onboardings')
 
 @platform_required()
 def businesses(request):

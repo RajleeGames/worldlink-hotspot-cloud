@@ -5,6 +5,7 @@ urlpatterns = [
     path('routers/new/',views.router_edit,name='router_new'),
     path('routers/<int:pk>/edit/',views.router_edit,name='router_edit'),
     path('routers/<int:pk>/connect/',views.router_connect,name='router_connect'),
+    path('routers/<int:pk>/omada/',views.omada_onboarding,name='omada_onboarding'),
     path('routers/<int:pk>/delete/',views.router_delete,name='router_delete'),
     path('locations/',views.location_list,name='locations'),
     path('locations/new/',views.location_add,name='location_new'),
