@@ -1,96 +1,96 @@
-{% extends 'base.html' %}
+{% extends 'base.html' %}{% load translations %}
 {% block content %}
-<div class="page-heading"><div><p class="eyebrow">WORLDLINK OPERATIONS · ROUTER REQUEST #{{ profile.pk }}</p>
+<div class="page-heading"><div><p class="eyebrow">{% t 'WORLDLINK OPERATIONS · ROUTER REQUEST' %} #{{ profile.pk }}</p>
   <h1>{{ profile.router.company.name }} · {{ profile.router.name }}</h1>
-  <p>Dedicated controller review · No router or merchant passwords are stored here.</p></div>
-  <a class="button button-secondary" href="{% url 'controlcenter:router_onboardings' %}">← All requests</a></div>
+  <p>{% t 'Dedicated controller review · No router or merchant passwords are stored here.' %}</p></div>
+  <a class="button button-secondary" href="{% url 'controlcenter:router_onboardings' %}">← {% t 'All requests' %}</a></div>
 
 <div class="onboard-progress">
-  <div><span class="onboard-step">01</span><strong>Submitted</strong><small>{{ profile.submitted_at|date:'d M Y H:i'|default:'Not submitted' }}</small></div>
-  <div><span class="onboard-step">02</span><strong>Site reviewed</strong><small>{{ profile.get_status_display }}</small></div>
-  <div><span class="onboard-step">03</span><strong>AP connected</strong><small>{% if connected %}Verified online{% else %}Needs fresh read-only check{% endif %}</small></div>
-  <div><span class="onboard-step">04</span><strong>Voucher access</strong><small>{% if profile.voucher_access_approved_at %}Staff approved{% else %}Not approved{% endif %}</small></div>
-  <div><span class="onboard-step">05</span><strong>EvPay</strong><small>{% if profile.live_payments_approved_at %}Staff approved · rollout gate applies{% else %}Not approved{% endif %}</small></div>
+  <div><span class="onboard-step">01</span><strong>{% t 'Submitted' %}</strong><small>{{ profile.submitted_at|date:'d M Y H:i'|default:'Not submitted' }}</small></div>
+  <div><span class="onboard-step">02</span><strong>{% t 'Site reviewed' %}</strong><small>{% t profile.get_status_display %}</small></div>
+  <div><span class="onboard-step">03</span><strong>{% t 'AP connected' %}</strong><small>{% if connected %}{% t 'Verified online' %}{% else %}{% t 'Needs fresh read-only check' %}{% endif %}</small></div>
+  <div><span class="onboard-step">04</span><strong>{% t 'Voucher access' %}</strong><small>{% if profile.voucher_access_approved_at %}{% t 'Staff approved' %}{% else %}{% t 'Not approved' %}{% endif %}</small></div>
+  <div><span class="onboard-step">05</span><strong>EvPay</strong><small>{% if profile.live_payments_approved_at %}{% t 'Staff approved · rollout gate applies' %}{% else %}{% t 'Not approved' %}{% endif %}</small></div>
 </div>
 
 <div class="onboard-layout">
   <div class="onboard-stack">
-    <section class="panel"><div class="panel-heading"><div><h2>Customer device details</h2><p>Data submitted by this business. Verify hardware in the actual Omada site.</p></div></div>
+    <section class="panel"><div class="panel-heading"><div><h2>{% t 'Customer device details' %}</h2><p>{% t 'Data submitted by this business. Verify hardware in the actual Omada site.' %}</p></div></div>
       <dl class="onboard-kv">
-        <div><dt>Business</dt><dd>{{ profile.router.company.name }} <span class="pill pending">{{ profile.router.company.get_status_display }}</span></dd></div>
-        <div><dt>Router</dt><dd>{{ profile.router.name }} · {{ profile.router.model_name|default:'No model' }}</dd></div>
-        <div><dt>Location</dt><dd>{{ profile.router.location.name }}</dd></div>
-        <div><dt>Serial</dt><dd class="mono">{{ profile.router.serial|default:'Not provided' }}</dd></div>
+        <div><dt>{% t 'Business' %}</dt><dd>{{ profile.router.company.name }} <span class="pill pending">{% t profile.router.company.get_status_display %}</span></dd></div>
+        <div><dt>{% t 'Router' %}</dt><dd>{{ profile.router.name }} · {{ profile.router.model_name|default:'No model' }}</dd></div>
+        <div><dt>{% t 'Location' %}</dt><dd>{{ profile.router.location.name }}</dd></div>
+        <div><dt>{% t 'Serial' %}</dt><dd class="mono">{{ profile.router.serial|default:'Not provided' }}</dd></div>
         <div><dt>AP MAC</dt><dd class="mono">{{ profile.ap_mac|default:'Not provided' }}</dd></div>
-        <div><dt>Guest SSID</dt><dd>{{ profile.ssid_name|default:'Not provided' }}</dd></div>
-        <div><dt>Connection mode</dt><dd>{{ profile.get_connection_mode_display }}</dd></div>
+        <div><dt>{% t 'Guest SSID' %}</dt><dd>{{ profile.ssid_name|default:'Not provided' }}</dd></div>
+        <div><dt>{% t 'Connection mode' %}</dt><dd>{% t profile.get_connection_mode_display %}</dd></div>
         {% if profile.controller_origin %}<div><dt>Customer controller origin</dt><dd class="mono">{{ profile.controller_origin }}</dd></div>{% endif %}
         {% if profile.controller_id %}<div><dt>Customer controller ID</dt><dd class="mono">{{ profile.controller_id }}</dd></div>{% endif %}
-        <div><dt>Notes</dt><dd>{{ profile.setup_notes|default:'No notes'|linebreaksbr }}</dd></div>
+        <div><dt>{% t 'Notes' %}</dt><dd>{{ profile.setup_notes|default:'No notes'|linebreaksbr }}</dd></div>
       </dl>
     </section>
-    <section class="panel"><div class="panel-heading"><div><h2>Central Omada site assignment</h2><p>Only WorldLink operations may enter these controller IDs.</p></div></div>
+    <section class="panel"><div class="panel-heading"><div><h2>{% t 'Central Omada site assignment' %}</h2><p>{% t 'Only WorldLink operations may enter these controller IDs.' %}</p></div></div>
       {% if profile.managed_site %}<dl class="onboard-kv">
-        <div><dt>Assigned site</dt><dd>{{ profile.managed_site.name }}</dd></div>
+        <div><dt>{% t 'Assigned site' %}</dt><dd>{{ profile.managed_site.name }}</dd></div>
         <div><dt>Device Inform ID</dt><dd class="mono">{{ profile.managed_site.inform_site_id }}</dd></div>
         <div><dt>Open API siteId</dt><dd class="mono">{{ profile.managed_site.openapi_site_id }}</dd></div>
-        <div><dt>Customer inform URL</dt><dd class="mono">{{ profile.managed_site.inform_url|default:'Configure central inform hostname' }}</dd></div>
-      </dl>{% else %}<div class="onboard-empty">No central site assigned yet. Create a separate business site in Omada before reviewing the setup.</div>{% endif %}
+        <div><dt>{% t 'Customer inform URL' %}</dt><dd class="mono">{{ profile.managed_site.inform_url|default:'Configure central inform hostname' }}</dd></div>
+      </dl>{% else %}<div class="onboard-empty">{% t 'No central site assigned yet. Create a separate business site in Omada before reviewing the setup.' %}</div>{% endif %}
       {% if profile.status == 'SUBMITTED' and can_manage_platform %}
       <form method="post" action="{% url 'controlcenter:review_router_onboarding' profile.pk %}" class="onboard-form">{% csrf_token %}<input type="hidden" name="review_page" value="1">
-        <div class="field"><label for="site-name">Central Omada site name</label><input class="input" id="site-name" name="site_name" maxlength="120" placeholder="Business · Main Site" autocomplete="off"></div>
-        <div class="field"><label for="site-inform">Site Inform ID (omadacId)</label><input class="input mono" id="site-inform" name="inform_site_id" maxlength="80" placeholder="Copy from Omada device Inform URL" autocomplete="off"></div>
-        <div class="field"><label for="site-api">Open API siteId</label><input class="input mono" id="site-api" name="openapi_site_id" maxlength="80" placeholder="From list_omada_sites" autocomplete="off"></div>
-        <div class="field onboard-span"><label for="review-note">Review note for the business</label><textarea class="input" id="review-note" name="note" rows="3" maxlength="400" placeholder="Instructions or missing details; never passwords"></textarea></div>
-        <div class="onboard-form-actions"><button class="button button-secondary" type="submit" name="decision" value="needs_info" formnovalidate>Request more details</button>
-          <button class="button button-primary" type="submit" name="decision" value="reviewed">Approve site mapping</button></div>
+        <div class="field"><label for="site-name">{% t 'Central Omada site name' %}</label><input class="input" id="site-name" name="site_name" maxlength="120" placeholder="{% t 'Business · Main Site' %}" autocomplete="off"></div>
+        <div class="field"><label for="site-inform">Site Inform ID (omadacId)</label><input class="input mono" id="site-inform" name="inform_site_id" maxlength="80" placeholder="{% t 'Copy from Omada device Inform URL' %}" autocomplete="off"></div>
+        <div class="field"><label for="site-api">Open API siteId</label><input class="input mono" id="site-api" name="openapi_site_id" maxlength="80" placeholder="{% t 'From list_omada_sites' %}" autocomplete="off"></div>
+        <div class="field onboard-span"><label for="review-note">{% t 'Review note for the business' %}</label><textarea class="input" id="review-note" name="note" rows="3" maxlength="400" placeholder="{% t 'Instructions or missing details; never passwords' %}"></textarea></div>
+        <div class="onboard-form-actions"><button class="button button-secondary" type="submit" name="decision" value="needs_info" formnovalidate>{% t 'Request more details' %}</button>
+          <button class="button button-primary" type="submit" name="decision" value="reviewed">{% t 'Approve site mapping' %}</button></div>
       </form>{% endif %}
     </section>
   </div>
   <div class="onboard-stack">
-    <section class="panel"><div class="panel-heading"><div><h2>Connection verification</h2><p>Read-only status; never inferred from a saved MAC.</p></div></div>
+    <section class="panel"><div class="panel-heading"><div><h2>{% t 'Connection verification' %}</h2><p>{% t 'Read-only status; never inferred from a saved MAC.' %}</p></div></div>
       <div class="onboard-status {% if connected %}onboard-status-online{% endif %}">
-        <strong>{% if connected %}● Online · verified{% elif observation %}{{ observation.get_state_display }}{% else %}Not checked yet{% endif %}</strong>
-        <small>{% if observation %}Last checked {{ observation.checked_at|date:'d M Y H:i:s' }}{% else %}Run the monitored Omada poll after adopting the AP.{% endif %}</small>
+        <strong>{% if connected %}● {% t 'Online · verified' %}{% elif observation %}{% t observation.get_state_display %}{% else %}{% t 'Not checked yet' %}{% endif %}</strong>
+        <small>{% if observation %}{% t 'Last checked' %} {{ observation.checked_at|date:'d M Y H:i:s' }}{% else %}{% t 'Run the monitored Omada poll after adopting the AP.' %}{% endif %}</small>
       </div>
-      <div class="onboard-help">On the main WorldLink server, run <code>python manage.py poll_omada_managed</code> to refresh trusted Omada status. Only approve live sales after a real device test.</div>
+      <div class="onboard-help">{% t 'On the main WorldLink server, run' %} <code>python manage.py poll_omada_managed</code> {% t 'to refresh trusted Omada status. Only approve live sales after a real device test.' %}</div>
     </section>
-    <section class="panel"><div class="panel-heading"><div><h2>Printed voucher Wi-Fi access</h2><p>Offline cash sales only. Independent of EvPay merchant payments.</p></div></div>
+    <section class="panel"><div class="panel-heading"><div><h2>{% t 'Printed voucher Wi-Fi access' %}</h2><p>{% t 'Offline cash sales only. Independent of EvPay merchant payments.' %}</p></div></div>
       {% if profile.voucher_access_approved_at %}
-      <div class="onboard-status onboard-status-online"><strong>Voucher redemption approved</strong><small>Verified by {{ profile.voucher_access_approved_by }} on {{ profile.voucher_access_approved_at|date:'d M Y H:i' }}.</small></div>
-      {% if can_manage_platform %}<form method="post" action="{% url 'controlcenter:router_voucher_access' profile.pk %}" class="onboard-action-form">{% csrf_token %}<button type="submit" class="button button-secondary" name="decision" value="disable">Revoke voucher access</button></form>{% endif %}
+      <div class="onboard-status onboard-status-online"><strong>{% t 'Voucher redemption approved' %}</strong><small>{% t 'Verified by' %} {{ profile.voucher_access_approved_by }} {% t 'on' %} {{ profile.voucher_access_approved_at|date:'d M Y H:i' }}.</small></div>
+      {% if can_manage_platform %}<form method="post" action="{% url 'controlcenter:router_voucher_access' profile.pk %}" class="onboard-action-form">{% csrf_token %}<button type="submit" class="button button-secondary" name="decision" value="disable">{% t 'Revoke voucher access' %}</button></form>{% endif %}
       {% elif can_manage_platform %}
       <form method="post" action="{% url 'controlcenter:router_voucher_access' profile.pk %}" class="onboard-action-form">{% csrf_token %}
-        <label class="onboard-check"><input type="checkbox" name="hotspot_verified" value="yes" required> I tested the physical AP, exact SSID, and its WorldLink external captive portal.</label>
-        <button type="submit" name="decision" value="enable" class="button button-primary" {% if not can_enable_live %}disabled{% endif %}>Approve printed voucher activation</button>
-        {% if not can_enable_live %}<small class="field-hint">First verify an active business, assigned site and freshly connected AP.</small>{% endif %}
-      </form>{% else %}<div class="onboard-help">Only WorldLink operations can enable voucher internet access.</div>{% endif %}
+        <label class="onboard-check"><input type="checkbox" name="hotspot_verified" value="yes" required> {% t 'I tested the physical AP, exact SSID, and its WorldLink external captive portal.' %}</label>
+        <button type="submit" name="decision" value="enable" class="button button-primary" {% if not can_enable_live %}disabled{% endif %}>{% t 'Approve printed voucher activation' %}</button>
+        {% if not can_enable_live %}<small class="field-hint">{% t 'First verify an active business, assigned site and freshly connected AP.' %}</small>{% endif %}
+      </form>{% else %}<div class="onboard-help">{% t 'Only WorldLink operations can enable voucher internet access.' %}</div>{% endif %}
     </section>
-    <section class="panel"><div class="panel-heading"><div><h2>Live Wi-Fi payment authorization</h2><p>Separate staff approval. It never changes EvPay merchant credentials.</p></div></div>
+    <section class="panel"><div class="panel-heading"><div><h2>{% t 'Live Wi-Fi payment authorization' %}</h2><p>{% t 'Separate staff approval. It never changes EvPay merchant credentials.' %}</p></div></div>
       <div class="onboard-checks">
-        <div><span>Business subscription</span><strong>{{ profile.router.company.get_status_display }}</strong></div>
-        <div><span>Connected AP</span><strong>{% if connected %}Verified{% else %}Not verified{% endif %}</strong></div>
-        <div><span>Company collection allowlist</span><strong>{% if company_allowlisted %}Listed{% else %}Not listed{% endif %}</strong></div>
-        <div><span>Multi-business rollout switch</span><strong>{% if multitenant_flag %}Enabled{% else %}Off (safe default){% endif %}</strong></div>
+        <div><span>{% t 'Business subscription' %}</span><strong>{% t profile.router.company.get_status_display %}</strong></div>
+        <div><span>{% t 'Connected AP' %}</span><strong>{% if connected %}{% t 'Verified' %}{% else %}{% t 'Not verified' %}{% endif %}</strong></div>
+        <div><span>{% t 'Company collection allowlist' %}</span><strong>{% if company_allowlisted %}{% t 'Listed' %}{% else %}{% t 'Not listed' %}{% endif %}</strong></div>
+        <div><span>{% t 'Multi-business rollout switch' %}</span><strong>{% if multitenant_flag %}{% t 'Enabled' %}{% else %}{% t 'Off (safe default)' %}{% endif %}</strong></div>
       </div>
       {% if profile.live_payments_approved_at %}
-      <div class="onboard-status onboard-status-online"><strong>Staff payment approval recorded</strong><small>By {{ profile.live_payments_approved_by }} on {{ profile.live_payments_approved_at|date:'d M Y H:i' }}. Company allowlist and rollout switch still control real checkout.</small></div>
-      {% if can_manage_platform %}<form method="post" action="{% url 'controlcenter:router_live_payments' profile.pk %}" class="onboard-action-form">{% csrf_token %}<button type="submit" name="decision" value="disable" class="button button-secondary">Revoke payment approval</button></form>{% endif %}
+      <div class="onboard-status onboard-status-online"><strong>{% t 'Staff payment approval recorded' %}</strong><small>{% t 'By' %} {{ profile.live_payments_approved_by }} {% t 'on' %} {{ profile.live_payments_approved_at|date:'d M Y H:i' }}. {% t 'Company allowlist and rollout switch still control real checkout.' %}</small></div>
+      {% if can_manage_platform %}<form method="post" action="{% url 'controlcenter:router_live_payments' profile.pk %}" class="onboard-action-form">{% csrf_token %}<button type="submit" name="decision" value="disable" class="button button-secondary">{% t 'Revoke payment approval' %}</button></form>{% endif %}
       {% elif can_manage_platform %}
       <form method="post" action="{% url 'controlcenter:router_live_payments' profile.pk %}" class="onboard-action-form">{% csrf_token %}
-        <label class="onboard-check"><input type="checkbox" name="provider_authorized" value="yes" required> I verified that EvPay permits WorldLink to collect on behalf of this specific business.</label>
-        <label class="onboard-check"><input type="checkbox" name="test_verified" value="yes" required> I tested this exact AP/SSID and confirmed the correct captive portal and authorization.</label>
-        <button type="submit" name="decision" value="enable" class="button button-primary" {% if not can_enable_live %}disabled{% endif %}>Approve this AP for live payments</button>
-        {% if not can_enable_live %}<small class="field-hint">Requires an active company, approved central site, and fresh connected AP observation.</small>{% endif %}
-      </form>{% else %}<div class="onboard-help">Only authorized WorldLink staff can enable live payments.</div>{% endif %}
+        <label class="onboard-check"><input type="checkbox" name="provider_authorized" value="yes" required> {% t 'I verified that EvPay permits WorldLink to collect on behalf of this specific business.' %}</label>
+        <label class="onboard-check"><input type="checkbox" name="test_verified" value="yes" required> {% t 'I tested this exact AP/SSID and confirmed the correct captive portal and authorization.' %}</label>
+        <button type="submit" name="decision" value="enable" class="button button-primary" {% if not can_enable_live %}disabled{% endif %}>{% t 'Approve this AP for live payments' %}</button>
+        {% if not can_enable_live %}<small class="field-hint">{% t 'Requires an active company, approved central site, and fresh connected AP observation.' %}</small>{% endif %}
+      </form>{% else %}<div class="onboard-help">{% t 'Only authorized WorldLink staff can enable live payments.' %}</div>{% endif %}
     </section>
     {% if can_manage_platform and profile.status == 'REVIEWED' %}
-    <section class="panel"><div class="panel-heading"><div><h2>Transfer this physical AP</h2><p>One EAP can serve only one approved tenant at a time. Preserve historical sales and stop new sales before changing its site.</p></div></div>
-      <div class="onboard-help">Wait until all paid sessions end and pending EvPay orders reconcile. For an old legacy pilot, disable its AP/company environment binding first. This only releases database approval; Omada device migration is a separate controlled step.</div>
+    <section class="panel"><div class="panel-heading"><div><h2>{% t 'Transfer this physical AP' %}</h2><p>{% t 'One EAP can serve only one approved tenant at a time. Preserve historical sales and stop new sales before changing its site.' %}</p></div></div>
+      <div class="onboard-help">{% t 'Wait until paid sessions end and pending EvPay orders reconcile. Disable any old pilot binding first. Database retirement does not migrate an Omada device.' %}</div>
       <form method="post" action="{% url 'controlcenter:router_retire' profile.pk %}" class="onboard-action-form">{% csrf_token %}
-        <label for="retire-confirmation" class="guest-label">Type RETIRE to release this AP for another business</label>
+        <label for="retire-confirmation" class="guest-label">{% t 'Type RETIRE to release this AP for another business' %}</label>
         <input id="retire-confirmation" class="input" name="confirmation" autocomplete="off" required pattern="RETIRE" placeholder="RETIRE">
-        <button type="submit" class="button button-secondary">Retire approval · preserve history</button>
+        <button type="submit" class="button button-secondary">{% t 'Retire approval · preserve history' %}</button>
       </form>
     </section>{% endif %}
   </div>

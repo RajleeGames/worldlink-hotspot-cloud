@@ -1,60 +1,59 @@
 {% extends 'base.html' %}{% load translations %}
 {% block content %}
 <div class="page-heading">
-  <div><p class="eyebrow">NETWORK · MIKROTIK PILOT</p><h1>Connect {{ router.name }}</h1>
-    <p>Test RouterOS v7 safely, then activate vouchers already sold and confirmed by your business.</p></div>
-  <a class="button button-secondary" href="{% url 'networks:routers' %}">← Routers</a>
+  <div><p class="eyebrow">{% t 'NETWORK · MIKROTIK PILOT' %}</p><h1>{% t 'Connect' %} {{ router.name }}</h1>
+    <p>{% t 'Test RouterOS v7 safely, then activate vouchers already sold and confirmed by your business.' %}</p></div>
+  <a class="button button-secondary" href="{% url 'networks:routers' %}">← {% t 'Routers' %}</a>
 </div>
 <div class="wallet-stats">
-  <div class="wallet-metric"><span>Management address</span><strong>{{ router.address|default:'Not set' }}:{{ router.management_port }}</strong><small>HTTPS over private LAN/VPN only</small></div>
-  <div class="wallet-metric"><span>Sold vouchers to sync</span><strong>{{ unsynced_sold }}</strong><small>Unpaid vouchers are never activated</small></div>
-  <div class="wallet-metric"><span>Already synced here</span><strong>{{ synced_count }}</strong><small>Previously confirmed on this router</small></div>
+  <div class="wallet-metric"><span>{% t 'Management address' %}</span><strong>{{ router.address|default:'Not set' }}:{{ router.management_port }}</strong><small>{% t 'HTTPS over private LAN/VPN only' %}</small></div>
+  <div class="wallet-metric"><span>{% t 'Sold vouchers to sync' %}</span><strong>{{ unsynced_sold }}</strong><small>{% t 'Unpaid vouchers are never activated' %}</small></div>
+  <div class="wallet-metric"><span>{% t 'Already synced here' %}</span><strong>{{ synced_count }}</strong><small>{% t 'Previously confirmed on this router' %}</small></div>
 </div>
 <div class="wallet-columns">
   <section class="panel">
-    <div class="panel-heading"><div><h2>Router connection</h2><p>Your router password is used for this request only. WorldLink does not save it.</p></div></div>
-    {% if not router.address %}<div class="integration-notice notice-neutral">First edit this router and enter its LAN/VPN management IP address.</div>{% endif %}
+    <div class="panel-heading"><div><h2>{% t 'Router connection' %}</h2><p>{% t 'Your router password is used for this request only. WorldLink does not save it.' %}</p></div></div>
+    {% if not router.address %}<div class="integration-notice notice-neutral">{% t 'First edit this router and enter its LAN/VPN management IP address.' %}</div>{% endif %}
     <form class="router-connect-form" method="post" autocomplete="off">{% csrf_token %}
       {% for field in form %}
       <div class="field">
-        <label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
-        {% if field.help_text %}<small class="field-hint">{{ field.help_text }}</small>{% endif %}
+        <label for="{{ field.id_for_label }}">{% t field.label %}</label>{{ field }}
+        {% if field.help_text %}<small class="field-hint">{% t field.help_text %}</small>{% endif %}
         {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
       </div>
       {% endfor %}
       {% if form.non_field_errors %}<div class="field-error">{{ form.non_field_errors }}</div>{% endif %}
       <div class="form-actions">
-        <button class="button button-secondary" name="action" value="test" type="submit">Test connection</button>
-        <button class="button button-secondary" name="action" value="online" type="submit">View live users</button>
-        <button class="button button-primary" name="action" value="sync" type="submit">Sync up to 10 sold vouchers</button>
+        <button class="button button-secondary" name="action" value="test" type="submit">{% t 'Test connection' %}</button>
+        <button class="button button-secondary" name="action" value="online" type="submit">{% t 'View live users' %}</button>
+        <button class="button button-primary" name="action" value="sync" type="submit">{% t 'Sync up to 10 sold vouchers' %}</button>
       </div>
     </form>
     {% if info %}<div class="router-notice">
-      <strong>Router recognized:</strong> {{ info.model }} · RouterOS {{ info.version }}
-      {% if sync_count != None %}<p>{{ sync_count }} voucher(s) confirmed on the router.</p>{% endif %}
+      <strong>{% t 'Router recognized:' %}</strong> {{ info.model }} · RouterOS {{ info.version }}
+      {% if sync_count != None %}<p>{{ sync_count }} {% t 'voucher(s) confirmed on the router.' %}</p>{% endif %}
     </div>{% endif %}
     {% if online_users != None %}
-    <div class="router-notice"><strong>Live router snapshot: {{ online_total }} active sessions</strong>
-      <p>Read directly from MikroTik at the time you clicked. This is not continuous monitoring.</p></div>
-    <div class="table-wrap"><table class="data-table"><thead><tr><th>HotSpot login</th><th>IP</th><th>Online for</th></tr></thead><tbody>
+    <div class="router-notice"><strong>{% t 'Live router snapshot:' %} {{ online_total }} {% t 'active sessions' %}</strong>
+      <p>{% t 'Read directly from MikroTik at the time you clicked. This is not continuous monitoring.' %}</p></div>
+    <div class="table-wrap"><table class="data-table"><thead><tr><th>{% t 'HotSpot login' %}</th><th>IP</th><th>{% t 'Online for' %}</th></tr></thead><tbody>
       {% for item in online_users %}<tr><td class="mono">{{ item.username }}</td><td class="mono">{{ item.address }}</td><td>{{ item.uptime }}</td></tr>
-      {% empty %}<tr><td colspan="3" class="empty-cell">No active customers reported by this router.</td></tr>{% endfor %}
+      {% empty %}<tr><td colspan="3" class="empty-cell">{% t 'No active customers reported by this router.' %}</td></tr>{% endfor %}
     </tbody></table></div>
     {% endif %}
   </section>
   <section class="panel">
-    <div class="panel-heading"><div><h2>Before your first test</h2><p>A short checklist for the technician</p></div></div>
+    <div class="panel-heading"><div><h2>{% t 'Before your first test' %}</h2><p>{% t 'A short checklist for the technician' %}</p></div></div>
     <ol class="router-steps">
-      <li>RouterOS <strong>v7</strong> and its <strong>HotSpot server</strong> must already be enabled on the guest bridge.</li>
-      <li>Enable <strong>www-ssl</strong> for RouterOS REST. Keep it restricted to the management LAN or VPN—never the public internet.</li>
-      <li>Use a dedicated RouterOS login for WorldLink. Configure a trusted HTTPS certificate where possible.</li>
-      <li>WorldLink's server must be able to reach the router's IP. An administrator must allow-list it using <code>MIKROTIK_ALLOWED_CIDRS</code>.</li>
-      <li>Test connection, then sync <strong>SOLD</strong> vouchers. Customers enter the printed code as both username and password on the MikroTik HotSpot login page.</li>
+      <li>{% t 'RouterOS v7 and its HotSpot server must already be enabled on the guest bridge.' %}</li>
+      <li>{% t 'Enable www-ssl for RouterOS REST, restricted to the management LAN or VPN; never public internet.' %}</li>
+      <li>{% t 'Use a dedicated RouterOS login for WorldLink and a trusted HTTPS certificate where possible.' %}</li>
+      <li>{% t 'The WorldLink server must reach the router IP. Allowlist it using MIKROTIK_ALLOWED_CIDRS.' %}</li>
+      <li>{% t 'Test the connection, then sync sold vouchers. Guests use each printed code as both HotSpot username and password.' %}</li>
     </ol>
     <div class="router-notice">
-      <strong>Pilot limitations:</strong> Multi-business live EvPay auto-activation and Omada/Cudy provisioning,
-      remote connectivity through mobile CGNAT, and live online-user polling are not implemented yet.
-      RouterOS <em>limit-uptime</em> measures total connected usage, not calendar time from first login.
+      <strong>{% t 'Pilot limitations:' %}</strong> {% t 'Multi-business live EvPay activation, Omada/Cudy provisioning, mobile CGNAT remote connectivity and continuous online-user polling are not implemented in this MikroTik pilot.' %}
+      {% t 'RouterOS limit-uptime measures total connected usage, not calendar time from first login.' %}
     </div>
   </section>
 </div>

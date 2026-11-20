@@ -1,19 +1,19 @@
-{% extends 'portal/base.html' %}
+{% extends 'portal/base.html' %}{% load translations %}
 {% block guest_content %}
 <div class="guest-narrow">
   <section class="guest-status-panel">
     <div class="guest-status-symbol {% if collection.status == 'SETTLED' or collection.status == 'SUCCESS' %}guest-status-success{% endif %}">{% if collection.status == 'SETTLED' or collection.status == 'SUCCESS' %}✓{% else %}···{% endif %}</div>
-    <h1>{% if collection.status == 'SETTLED' or collection.status == 'SUCCESS' %}Payment confirmed{% elif collection.status == 'FAILED' %}Payment failed{% elif collection.status == 'REFUNDED' or collection.status == 'REVERSED' %}Payment reversed{% else %}Check your phone{% endif %}</h1>
-    <p>{% if collection.omada_activated_at %}Wi-Fi access activated for your purchased package. Enjoy!{% elif collection.status == 'SETTLED' or collection.status == 'SUCCESS' %}EvPay verified your payment. Wi-Fi activation is pending with the network controller.{% elif collection.status == 'FAILED' %}The payment did not complete. No money was credited.{% elif collection.status == 'UNKNOWN' %}The provider response was uncertain. Do not pay again; ask support to check this reference.{% else %}Approve the official mobile-money prompt. This page will update when EvPay confirms it.{% endif %}</p>
+    <h1>{% if collection.status == 'SETTLED' or collection.status == 'SUCCESS' %}{{ w.payment_confirmed }}{% elif collection.status == 'FAILED' %}{{ w.payment_failed }}{% elif collection.status == 'REFUNDED' or collection.status == 'REVERSED' %}{{ w.payment_reversed }}{% else %}{{ w.check_phone }}{% endif %}</h1>
+    <p>{% if collection.omada_activated_at %}{{ w.wifi_activated }}{% elif collection.status == 'SETTLED' or collection.status == 'SUCCESS' %}{{ w.payment_verified_pending }}{% elif collection.status == 'FAILED' %}{{ w.payment_failed_note }}{% elif collection.status == 'UNKNOWN' %}{{ w.provider_uncertain }}{% else %}{{ w.approve_prompt }}{% endif %}</p>
   </section>
   <section class="guest-receipt">
-    <div><span>Reference</span><strong class="guest-mono">{{ collection.reference }}</strong></div>
-    <div><span>Package</span><strong>{{ collection.plan.name }}</strong></div>
-    <div><span>Amount</span><strong>TZS {{ collection.amount|floatformat:0 }}</strong></div>
-    <div><span>Status</span><strong>{{ collection.get_status_display }}</strong></div>
+    <div><span>{{ w.reference }}</span><strong class="guest-mono">{{ collection.reference }}</strong></div>
+    <div><span>{{ w.package }}</span><strong>{{ collection.plan.name }}</strong></div>
+    <div><span>{{ w.amount }}</span><strong>TZS {{ collection.amount|floatformat:0 }}</strong></div>
+    <div><span>{{ w.status }}</span><strong>{% t collection.get_status_display %}</strong></div>
   </section>
-  <p class="guest-privacy">Your payment goes to the WorldLink merchant account and is attributed to {{ company.name }}. Keep this reference for support.</p>
-  <a class="guest-primary guest-submit" href="{% url 'portal:evpay_status' company.slug collection.public_id %}?lang={{ lang }}">Refresh status</a>
+  <p class="guest-privacy">{{ w.merchant_payment_start }} {{ company.name }}. {{ w.merchant_payment_end }}</p>
+  <a class="guest-primary guest-submit" href="{% url 'portal:evpay_status' company.slug collection.public_id %}?lang={{ lang }}">{{ w.refresh }}</a>
   {% if not collection.omada_activated_at and collection.status != 'FAILED' and collection.status != 'REFUNDED' and collection.status != 'REVERSED' and collection.status != 'UNKNOWN' %}<script>setTimeout(function(){window.location.reload();}, 8000);</script>{% endif %}
 </div>
 {% endblock %}

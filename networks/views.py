@@ -112,6 +112,7 @@ def omada_onboarding(request, pk):
     action = request.POST.get('action') if request.method == 'POST' else None
     form = OmadaOnboardingForm(
         request.POST or None, instance=profile, submit=(action == 'submit'),
+        ui_lang=request.session.get('ui_lang', 'en'),
     )
     if request.method == 'POST':
         if action not in ('save', 'submit'):

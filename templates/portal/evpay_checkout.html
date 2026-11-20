@@ -1,24 +1,24 @@
 {% extends 'portal/base.html' %}
 {% block guest_content %}
 <div class="guest-narrow">
-  <a class="guest-back" href="{% url 'portal:public' company.slug %}?lang={{ lang }}">← Back to packages</a>
-  <div class="guest-page-title"><span class="guest-eyebrow">Secure mobile-money checkout</span>
-    <h1>Pay for Wi-Fi</h1><p>EvPay will send a payment request to your phone. You approve it with your mobile-money PIN.</p></div>
-  <div class="guest-order-summary"><div><small>Package</small><h2>{{ plan.name }}</h2><span>{{ plan.duration_minutes }} minutes · {{ plan.device_limit }} device(s)</span></div>
+  <a class="guest-back" href="{% url 'portal:public' company.slug %}?lang={{ lang }}">← {{ w.back }}</a>
+  <div class="guest-page-title"><span class="guest-eyebrow">{{ w.mobile_eyebrow }}</span>
+    <h1>{{ w.mobile_title }}</h1><p>{{ w.mobile_intro }}</p></div>
+  <div class="guest-order-summary"><div><small>{{ w.package }}</small><h2>{{ plan.name }}</h2><span>{{ plan.duration_minutes }} {{ w.minutes }} · {{ plan.device_limit }} {{ w.devices }}</span></div>
     <div class="guest-amount"><small>TZS</small><strong>{{ plan.price|floatformat:0 }}</strong></div></div>
   <form method="post" class="guest-form" autocomplete="on">
     {% csrf_token %}{{ form.nonce }}<input type="hidden" name="lang" value="{{ lang }}">
     {% if form.non_field_errors %}<div class="guest-alert">{{ form.non_field_errors }}</div>{% endif %}
-    <label class="guest-label" for="{{ form.customer_name.id_for_label }}">Your name</label>{{ form.customer_name }}
+    <label class="guest-label" for="{{ form.customer_name.id_for_label }}">{{ w.customer_name }}</label>{{ form.customer_name }}
     {% if form.customer_name.errors %}<div class="guest-error">{{ form.customer_name.errors }}</div>{% endif %}
-    <label class="guest-label" for="{{ form.phone.id_for_label }}">Mobile-money phone number</label>{{ form.phone }}
+    <label class="guest-label" for="{{ form.phone.id_for_label }}">{{ w.mobile_phone }}</label>{{ form.phone }}
     {% if form.phone.errors %}<div class="guest-error">{{ form.phone.errors }}</div>{% endif %}
-    <label class="guest-label" for="{{ form.operator.id_for_label }}">Mobile-money provider</label>{{ form.operator }}
+    <label class="guest-label" for="{{ form.operator.id_for_label }}">{{ w.mobile_provider }}</label>{{ form.operator }}
     {% if form.operator.errors %}<div class="guest-error">{{ form.operator.errors }}</div>{% endif %}
-    <label class="guest-label">{{ form.authorized }} I authorize WorldLink to request TZS {{ plan.price|floatformat:0 }} from my phone.</label>
-    {% if form.authorized.errors %}<div class="guest-error">Please confirm you authorize this payment.</div>{% endif %}
-    <p class="guest-privacy">Never enter your mobile-money PIN on this website. Only approve the official prompt on your phone.</p>
-    <button type="submit" class="guest-primary guest-submit">Send USSD payment request →</button>
+    <label class="guest-label">{{ form.authorized }} {{ w.mobile_consent_start }} {{ plan.price|floatformat:0 }} {{ w.mobile_consent_end }}</label>
+    {% if form.authorized.errors %}<div class="guest-error">{{ w.mobile_consent_error }}</div>{% endif %}
+    <p class="guest-privacy">{{ w.pin_warning }}</p>
+    <button type="submit" class="guest-primary guest-submit">{{ w.send_push }} →</button>
   </form>
 </div>
 {% endblock %}

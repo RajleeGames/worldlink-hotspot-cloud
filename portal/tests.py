@@ -30,6 +30,22 @@ class PublicPortalTests(TestCase):
         self.assertNotContains(response, 'PRIVATE SECOND NETWORK')
         self.assertEqual(response.context['methods_count'], 1)
 
+    def test_guest_language_links_translate_portal_without_switching_business(self):
+        url = reverse('portal:public', args=[self.a.slug])
+        sw = self.client.get(url + '?lang=sw')
+        self.assertEqual(sw.status_code, 200)
+        self.assertContains(sw, 'lang="sw"')
+        self.assertContains(sw, 'Wi-Fi ya wageni')
+        self.assertContains(sw, 'Vifurushi vinavyopatikana')
+        self.assertContains(sw, 'One hour')  # Customer-defined plan names are not translated.
+        self.assertNotContains(sw, 'PRIVATE SECOND PLAN')
+
+        en = self.client.get(url + '?lang=en')
+        self.assertEqual(en.status_code, 200)
+        self.assertContains(en, 'lang="en"')
+        self.assertContains(en, 'Guest Wi-Fi')
+        self.assertContains(en, 'Available packages')
+
     def test_disabled_or_suspended_portal_is_not_public(self):
         self.a_portal.enabled = False
         self.a_portal.save()

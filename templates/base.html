@@ -16,7 +16,7 @@
 </head>
 <body class="app-body">
 {% include 'partials/preloader.html' %}
-<a href="#main-content" class="skip-link">Skip to content</a>
+<a href="#main-content" class="skip-link">{% t 'Skip to content' %}</a>
 {% include 'partials/shell_icons.html' %}
 <div class="shell">
   <aside class="sidebar" id="sidebar" aria-label="Main navigation">
@@ -32,14 +32,14 @@
       </div>
       <nav class="nav" aria-label="Main sections">
         {% if platform_area and can_view_platform %}
-        <span class="nav-heading">WORLDLINK · OPERATIONS</span>
+        <span class="nav-heading">{% t 'WORLDLINK · OPERATIONS' %}</span>
         <a href="{% url 'controlcenter:overview' %}" class="nav-link {% if request.resolver_match.url_name == 'overview' %}active{% endif %}"><svg class="icon"><use href="#ico-grid"></use></svg><span>{% t 'Control Center' %}</span></a>
         <a href="{% url 'controlcenter:businesses' %}" class="nav-link {% if request.resolver_match.url_name == 'businesses' or request.resolver_match.url_name == 'business_detail' %}active{% endif %}"><svg class="icon"><use href="#ico-router"></use></svg><span>{% t 'All businesses' %}</span></a>
-        <a href="{% url 'controlcenter:router_onboardings' %}" class="nav-link {% if request.resolver_match.url_name == 'router_onboardings' or request.resolver_match.url_name == 'router_onboarding_detail' %}active{% endif %}"><svg class="icon"><use href="#ico-router"></use></svg><span>Router onboarding</span></a>
+        <a href="{% url 'controlcenter:router_onboardings' %}" class="nav-link {% if request.resolver_match.url_name == 'router_onboardings' or request.resolver_match.url_name == 'router_onboarding_detail' %}active{% endif %}"><svg class="icon"><use href="#ico-router"></use></svg><span>{% t 'Router onboarding' %}</span></a>
         <a href="{% url 'controlcenter:users' %}" class="nav-link {% if request.resolver_match.url_name == 'users' or request.resolver_match.url_name == 'user_detail' %}active{% endif %}"><svg class="icon"><use href="#ico-user"></use></svg><span>{% t 'All user accounts' %}</span></a>
         <a href="{% url 'controlcenter:platform_customers' %}" class="nav-link {% if request.resolver_match.url_name == 'platform_customers' %}active{% endif %}"><svg class="icon"><use href="#ico-user"></use></svg><span>{% t 'Hotspot customers' %}</span></a>
         <a href="{% url 'controlcenter:platform_sessions' %}" class="nav-link {% if request.resolver_match.url_name == 'platform_sessions' %}active{% endif %}"><svg class="icon"><use href="#ico-chart"></use></svg><span>{% t 'Platform sessions' %}</span></a>
-        <a href="{% url 'controlcenter:platform_payments' %}" class="nav-link {% if request.resolver_match.url_name == 'platform_payments' %}active{% endif %}"><svg class="icon"><use href="#ico-wallet"></use></svg><span>Platform payments</span></a>
+        <a href="{% url 'controlcenter:platform_payments' %}" class="nav-link {% if request.resolver_match.url_name == 'platform_payments' %}active{% endif %}"><svg class="icon"><use href="#ico-wallet"></use></svg><span>{% t 'Platform payments' %}</span></a>
         <a href="{% url 'wallets:queue' %}" class="nav-link {% if request.resolver_match.namespace == 'wallets' %}active{% endif %}"><svg class="icon"><use href="#ico-wallet"></use></svg><span>{% t 'Withdrawals & collections' %}</span></a>
         <a href="{% url 'controlcenter:team' %}" class="nav-link {% if request.resolver_match.url_name == 'team' or request.resolver_match.url_name == 'staff_detail' or request.resolver_match.url_name == 'staff_invite' or request.resolver_match.url_name == 'invitation_created' %}active{% endif %}"><svg class="icon"><use href="#ico-shield"></use></svg><span>{% t 'WorldLink team' %}</span></a>
         <a href="{% url 'controlcenter:branding' %}" class="nav-link {% if request.resolver_match.url_name == 'branding' %}active{% endif %}"><svg class="icon"><use href="#ico-settings"></use></svg><span>{% t 'Platform branding' %}</span></a>
@@ -81,7 +81,7 @@
             <svg class="icon"><use href="#ico-settings"></use></svg><span>{% t 'Administration' %}</span><svg class="icon nav-chevron"><use href="#ico-chevron"></use></svg>
           </button>
           <div class="nav-panel"><div class="nav-panel-inner">
-            {% if active_membership.role == 'OWNER' or active_membership.role == 'MANAGER' %}<a href="{% url 'portal:settings' %}" title="Captive portal" class="nav-link {% if request.resolver_match.namespace == 'portal' %}active{% endif %}"><svg class="icon"><use href="#ico-router"></use></svg><span>{% t 'Captive portal' %}</span></a>{% if evpay_pilot_available %}<a href="{% url 'payments:evpay_lab' %}" title="EvPay test lab" class="nav-link {% if request.resolver_match.url_name == 'evpay_lab' %}active{% endif %}"><svg class="icon"><use href="#ico-wallet"></use></svg><span>EvPay test lab</span></a>{% endif %}<a href="{% url 'payments:methods' %}" title="Payment methods" class="nav-link {% if request.resolver_match.url_name == 'methods' or request.resolver_match.url_name == 'method_create' or request.resolver_match.url_name == 'method_edit' %}active{% endif %}"><svg class="icon"><use href="#ico-wallet"></use></svg><span>{% t 'Payment methods' %}</span></a>{% endif %}
+            {% if active_membership.role == 'OWNER' or active_membership.role == 'MANAGER' %}<a href="{% url 'portal:settings' %}" title="Captive portal" class="nav-link {% if request.resolver_match.namespace == 'portal' %}active{% endif %}"><svg class="icon"><use href="#ico-router"></use></svg><span>{% t 'Captive portal' %}</span></a>{% if evpay_pilot_available %}<a href="{% url 'payments:evpay_lab' %}" title="EvPay test lab" class="nav-link {% if request.resolver_match.url_name == 'evpay_lab' %}active{% endif %}"><svg class="icon"><use href="#ico-wallet"></use></svg><span>{% t 'EvPay test lab' %}</span></a>{% endif %}<a href="{% url 'payments:methods' %}" title="Payment methods" class="nav-link {% if request.resolver_match.url_name == 'methods' or request.resolver_match.url_name == 'method_create' or request.resolver_match.url_name == 'method_edit' %}active{% endif %}"><svg class="icon"><use href="#ico-wallet"></use></svg><span>{% t 'Payment methods' %}</span></a>{% endif %}
             {% if active_membership.role == 'OWNER' or active_membership.role == 'MANAGER' %}<a href="{% url 'tenants:settings' %}" title="{% t 'Business settings' %}" class="nav-link {% if request.resolver_match.namespace == 'tenants' and request.resolver_match.url_name == 'settings' %}active{% endif %}"><svg class="icon"><use href="#ico-settings"></use></svg><span>{% t 'Business settings' %}</span></a>{% endif %}
             <a href="{% url 'cloud:profile' %}" title="{% t 'My profile' %}" class="nav-link {% if request.resolver_match.url_name == 'profile' %}active{% endif %}"><svg class="icon"><use href="#ico-user"></use></svg><span>{% t 'My profile' %}</span></a>
             {% if user.is_superuser %}<a href="{% url 'admin:cloud_platformbranding_changelist' %}" title="{% t 'Platform branding' %}" class="nav-link"><svg class="icon"><use href="#ico-shield"></use></svg><span>{% t 'Platform branding' %}</span></a>{% endif %}
@@ -113,7 +113,7 @@
     </header>
     <main class="content" id="main-content">
       {% if messages %}<div class="flash-stack">{% for message in messages %}<div class="flash {{ message.tags }}" role="status">{{ message }}<button class="flash-dismiss" type="button" data-dismiss aria-label="Close">×</button></div>{% endfor %}</div>{% endif %}
-      {% if not platform_area %}<div class="integration-notice"><span class="notice-dot"></span><span>{% if omada_paid_pilot_enabled %}WorldLink-approved Wi-Fi payment route configured. Access is authorized only after EvPay confirms each payment; inventory vouchers are not Omada login codes.{% else %}Router payment activation is awaiting WorldLink approval. Inventory vouchers do not automatically grant Omada internet access.{% endif %}</span></div>{% endif %}
+      {% if not platform_area %}<div class="integration-notice"><span class="notice-dot"></span><span>{% if omada_paid_pilot_enabled %}{% t 'WorldLink-approved Wi-Fi payment route configured. Access is authorized only after EvPay confirms each payment.' %}{% else %}{% t 'Mobile-money access requires separate WorldLink approval. Staff-approved printed vouchers can activate Wi-Fi independently.' %}{% endif %}</span></div>{% endif %}
       {% block content %}{% endblock %}
       <footer class="footer"><span>© 2026 {{ platform_brand.name|default:'WORLDLINK SECURITY SYSTEMS' }}</span><span>WorldLink Hotspot Cloud · v0.9</span></footer>
     </main>

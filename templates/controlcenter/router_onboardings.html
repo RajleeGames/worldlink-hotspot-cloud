@@ -1,27 +1,27 @@
-{% extends 'base.html' %}
+{% extends 'base.html' %}{% load translations %}
 {% block content %}
-<div class="page-heading"><div><p class="eyebrow">WORLDLINK · NETWORK OPERATIONS</p><h1>Omada onboarding requests</h1>
-  <p>Each business has its own managed site, separate hardware verification and payment approval.</p></div>
-  <a class="button button-secondary" href="{% url 'controlcenter:overview' %}">← Control Center</a></div>
-<div class="onboard-banner"><strong>Easy multi-business setup, with WorldLink approval</strong><span>Customers submit AP details from anywhere. Open each request on its own page to assign the central site, verify its connection, and authorize payments separately. No VPN or shared admin passwords required.</span></div>
+<div class="page-heading"><div><p class="eyebrow">{% t 'WORLDLINK · NETWORK OPERATIONS' %}</p><h1>{% t 'Omada onboarding requests' %}</h1>
+  <p>{% t 'Each business has its own managed site, separate hardware verification and payment approval.' %}</p></div>
+  <a class="button button-secondary" href="{% url 'controlcenter:overview' %}">← {% t 'Control Center' %}</a></div>
+<div class="onboard-banner"><strong>{% t 'Easy multi-business setup, with WorldLink approval' %}</strong><span>{% t 'Customers submit AP details from anywhere. Assign each site, verify its connection, and approve payments separately. No VPN or shared admin passwords required.' %}</span></div>
 <div class="onboard-card-list">
   {% for item in records %}
   <article class="onboard-request">
     <div class="onboard-request-main"><div class="onboard-avatar">{{ item.router.company.name|slice:':1'|upper }}</div>
       <div class="onboard-request-copy"><span class="eyebrow">{{ item.router.company.name }} · {{ item.router.location.name }}</span>
         <h2>{{ item.router.name }}</h2><p>{{ item.router.model_name }} · <span class="mono">{{ item.ap_mac|default:'AP MAC missing' }}</span></p>
-        <small>Guest Wi-Fi: {{ item.ssid_name|default:'Awaiting SSID' }} · {{ item.updated_at|date:'d M Y H:i' }}</small></div></div>
-    <div class="onboard-request-meta"><span class="pill {% if item.status == 'REVIEWED' %}ready{% else %}pending{% endif %}">{{ item.get_status_display }}</span>
-      {% if item.live_payments_approved_at %}<span class="pill ready">Payment approval recorded</span>{% elif item.managed_site %}<span class="pill pending">Payments not approved</span>{% endif %}
-      <a class="button button-primary" href="{% url 'controlcenter:router_onboarding_detail' item.pk %}">Open review page →</a></div>
+        <small>{% t 'Guest Wi-Fi:' %} {{ item.ssid_name|default:'Awaiting SSID' }} · {{ item.updated_at|date:'d M Y H:i' }}</small></div></div>
+    <div class="onboard-request-meta"><span class="pill {% if item.status == 'REVIEWED' %}ready{% else %}pending{% endif %}">{% t item.get_status_display %}</span>
+      {% if item.live_payments_approved_at %}<span class="pill ready">{% t 'Payment approval recorded' %}</span>{% elif item.managed_site %}<span class="pill pending">{% t 'Payments not approved' %}</span>{% endif %}
+      <a class="button button-primary" href="{% url 'controlcenter:router_onboarding_detail' item.pk %}">{% t 'Open review page' %} →</a></div>
   </article>
   {% empty %}
-  <div class="onboard-empty">No Omada onboarding requests yet. Ask a business to create an Omada router and submit its setup form.</div>
+  <div class="onboard-empty">{% t 'No Omada onboarding requests yet. Ask a business to create an Omada router and submit its setup form.' %}</div>
   {% endfor %}
 </div>
 {% if records.has_other_pages %}<div class="pagination">
-  {% if records.has_previous %}<a class="button button-secondary" href="?page={{ records.previous_page_number }}">← Previous</a>{% endif %}
-  <span>Page {{ records.number }} of {{ records.paginator.num_pages }}</span>
-  {% if records.has_next %}<a class="button button-secondary" href="?page={{ records.next_page_number }}">Next →</a>{% endif %}
+  {% if records.has_previous %}<a class="button button-secondary" href="?page={{ records.previous_page_number }}">← {% t 'Previous' %}</a>{% endif %}
+  <span>{% t 'Page' %} {{ records.number }} {% t 'of' %} {{ records.paginator.num_pages }}</span>
+  {% if records.has_next %}<a class="button button-secondary" href="?page={{ records.next_page_number }}">{% t 'Next' %} →</a>{% endif %}
 </div>{% endif %}
 {% endblock %}

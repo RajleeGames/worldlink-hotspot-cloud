@@ -103,7 +103,8 @@ def voucher_redeem(request, slug):
             **_context(company, portal, _locale(request)), 'error': str(exc),
         }, status=400)
     else:
-        return redirect('portal:voucher_status', slug=slug, public_id=redemption.public_id)
+        url = reverse('portal:voucher_status', kwargs={'slug': slug, 'public_id': redemption.public_id})
+        return redirect(f'{url}?lang={_locale(request)}')
     response['Cache-Control'] = 'private, no-store'
     response['Referrer-Policy'] = 'same-origin'
     return response

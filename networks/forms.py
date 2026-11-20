@@ -89,9 +89,13 @@ class OmadaOnboardingForm(BaseStyledForm):
         model = OmadaOnboarding
         fields = ['connection_mode', 'controller_origin', 'controller_id', 'ap_mac', 'ssid_name', 'setup_notes']
 
-    def __init__(self, *args, submit=False, **kwargs):
+    def __init__(self, *args, submit=False, ui_lang='en', **kwargs):
         super().__init__(*args, **kwargs)
         self.submit = submit
+        if ui_lang == 'sw':
+            from cloud.templatetags.translations import SW
+            field = self.fields['connection_mode']
+            field.choices = [(value, SW.get(str(label), label)) for value, label in field.choices]
 
     def clean_controller_origin(self):
         value = self.cleaned_data['controller_origin'].strip()
