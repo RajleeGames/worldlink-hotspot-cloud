@@ -115,15 +115,31 @@ class OmadaMonitorTests(TestCase):
         self.assertNotIn('super-private-monitor-secret', record.reported_status)
 
     def test_unknown_numeric_status_does_not_claim_ap_is_online(self):
-        fake = FakeOmadaOpener(status=1)
+        fake = FakeOmadaOpener(status=99)
         with patch('networks.omada_monitor.build_opener', return_value=fake):
             record = poll_approved_pilot()
         self.assertEqual(record.state, OmadaDeviceObservation.State.UNKNOWN)
-        self.assertEqual(record.reported_status, '1')
+        self.assertEqual(record.reported_status, '99')
         self.client.force_login(self.owner)
         page = self.client.get(reverse('networks:routers'))
         self.assertContains(page, 'Status not recognized')
         self.assertNotContains(page, '<span class="pill ready">Connected</span>')
+
+    def test_open_api_numeric_status_codes_are_mapped_without_legacy_codes(self):
+        states = {
+            0: OmadaDeviceObservation.State.OFFLINE,
+            1: OmadaDeviceObservation.State.CONNECTED,
+            2: OmadaDeviceObservation.State.UNKNOWN,
+            3: OmadaDeviceObservation.State.OFFLINE,
+            4: OmadaDeviceObservation.State.OFFLINE,
+            14: OmadaDeviceObservation.State.UNKNOWN,
+            '1': OmadaDeviceObservation.State.CONNECTED,
+        }
+        for status, expected in states.items():
+            with self.subTest(status=status), patch(
+                'networks.omada_monitor.build_opener', return_value=FakeOmadaOpener(status=status),
+            ):
+                self.assertEqual(poll_approved_pilot().state, expected)
 
     def test_offline_and_missing_ap_are_not_online(self):
         for fake, expected in (

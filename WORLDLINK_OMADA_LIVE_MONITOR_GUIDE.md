@@ -7,7 +7,7 @@ This is an **incremental** patch on top of router onboarding v1 + the same-origi
 - `Connected`: an authenticated Omada Open API read returned an explicitly recognized **connected** state for the approved AP MAC in the selected site within the last 120 seconds.
 - `Offline`: Open API explicitly reported disconnected/isolated/heartbeat missed.
 - `AP not found`: the authorized site list completed successfully but the approved AP MAC was absent.
-- `Status not recognized`: a controller version returned an unfamiliar status representation (including **undocumented numeric codes**). We don't assume these mean online.
+- `Status not recognized`: a controller version returned an unfamiliar status representation (including **undocumented numeric codes**). The Open API's documented device-list statuses are `0` disconnected, `1` connected, `2` pending, `3` heartbeat missed, and `4` isolated. Pending and unknown do not imply online.
 - `Controller unavailable`: authentication, TLS, API, or parsing failed.
 - `Not recently verified`: no reading, an expired reading, or a router that no longer exactly matches the staff-reviewed pilot configuration.
 

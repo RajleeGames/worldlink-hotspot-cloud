@@ -189,13 +189,28 @@ class OmadaReadOnlyClient:
                     state = OmadaDeviceObservation.State.CONNECTED
                 elif normalized in ('DISCONNECTED', 'OFFLINE', 'ISOLATED', 'HEARTBEAT_MISSED'):
                     state = OmadaDeviceObservation.State.OFFLINE
+                elif normalized in ('0', '3', '4'):
+                    state = OmadaDeviceObservation.State.OFFLINE
+                elif normalized == '1':
+                    state = OmadaDeviceObservation.State.CONNECTED
+                else:
+                    state = OmadaDeviceObservation.State.UNKNOWN
+            elif type(status) is int:
+                # Omada *Open API* device-list status (not the legacy /api/v2
+                # grid/devices field): 0=disconnected, 1=connected, 2=pending,
+                # 3=heartbeat missed, 4=isolated. Pending/unknown must not
+                # appear as a successfully connected AP.
+                if status == 1:
+                    state = OmadaDeviceObservation.State.CONNECTED
+                elif status in (0, 3, 4):
+                    state = OmadaDeviceObservation.State.OFFLINE
                 else:
                     state = OmadaDeviceObservation.State.UNKNOWN
             elif type(device.get('connected')) is bool:
                 state = (OmadaDeviceObservation.State.CONNECTED if device['connected']
                          else OmadaDeviceObservation.State.OFFLINE)
             else:
-                # API versions may use undocumented numeric codes. Do not guess.
+                # Other/unexpected types are not evidence that the AP is online.
                 state = OmadaDeviceObservation.State.UNKNOWN
             reported = re.sub(r'[^a-zA-Z0-9_ -]', '', str(status))[:60] if status is not None else ''
             return state, reported
