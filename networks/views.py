@@ -93,7 +93,9 @@ def router_connect(request, pk):
         'online_users': online_users, 'online_total': online_total,
         'page_title': 'Connect MikroTik',
     })
-    response['Referrer-Policy'] = 'no-referrer'
+    # HTTPS CSRF checks need a same-origin Referer when the browser omits Origin.
+    # Keep it private from other sites while allowing our own POST forms to work.
+    response['Referrer-Policy'] = 'same-origin'
     response['Cache-Control'] = 'private, no-store'
     return response
 
@@ -129,7 +131,8 @@ def omada_onboarding(request, pk):
         'router': router, 'profile': saved_profile, 'form': form,
         'page_title': f'Connect {router.name} · Omada',
     })
-    response['Referrer-Policy'] = 'no-referrer'
+    # Do not suppress the same-origin Referer needed by Django CSRF checks.
+    response['Referrer-Policy'] = 'same-origin'
     response['Cache-Control'] = 'private, no-store'
     return response
 

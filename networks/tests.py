@@ -3,7 +3,7 @@ import ipaddress
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from tenants.models import Company, Membership
@@ -230,6 +230,24 @@ class OmadaOnboardingTests(TestCase):
         }
         data.update(changes)
         return data
+
+    def test_https_same_origin_form_post_passes_csrf_without_origin_header(self):
+        browser = Client(enforce_csrf_checks=True)
+        browser.force_login(self.owner)
+        page = browser.get(self.url, secure=True)
+        self.assertEqual(page.status_code, 200)
+        self.assertEqual(page.headers['Referrer-Policy'], 'same-origin')
+        self.assertIn('csrftoken', page.cookies)
+        payload = self.vpn_payload()
+        payload['csrfmiddlewaretoken'] = page.cookies['csrftoken'].value
+        result = browser.post(self.url, payload, secure=True,
+                              HTTP_REFERER='https://testserver' + self.url)
+        self.assertEqual(result.status_code, 302)
+        self.assertEqual(OmadaOnboarding.objects.get(router=self.router).status,
+                         OmadaOnboarding.Status.SUBMITTED)
+        # A missing Origin and Referer must still be rejected over HTTPS.
+        denied = browser.post(self.url, payload, secure=True)
+        self.assertEqual(denied.status_code, 403)
 
     def test_new_omada_router_can_request_review_without_credentials(self):
         self.client.force_login(self.owner)
