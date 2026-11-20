@@ -139,6 +139,8 @@ def shell_context(request):
         ('queue','destination_review','withdrawal_detail','withdrawal_review','collection_new')
     )))
     return {
+        'app_css_version':settings.APP_CSS_VERSION,
+        'app_js_version':settings.APP_JS_VERSION,
         'platform_area':platform_area,
         'active_membership':membership,
         'breadcrumbs':build_breadcrumbs(request) if request.user.is_authenticated else [],

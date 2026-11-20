@@ -8,7 +8,7 @@
   <meta name="referrer" content="same-origin">
   <title>{{ company.name }} · Guest Wi-Fi</title>
   {% if company.logo %}<link rel="icon" type="image/png" href="{{ company.logo.url }}">{% else %}<link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">{% endif %}
-  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=7">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ app_css_version }}">
   <style>:root { --portal-accent: {{ portal.accent_color }}; }</style>
 </head>
 <body class="guest-body">

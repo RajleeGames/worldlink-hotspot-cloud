@@ -11,8 +11,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=8">
-  <script defer src="{% static 'js/app.js' %}?v=7"></script>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ app_css_version }}">
+  <script defer src="{% static 'js/app.js' %}?v={{ app_js_version }}"></script>
 </head>
 <body class="app-body">
 {% include 'partials/preloader.html' %}
@@ -113,7 +113,7 @@
     </header>
     <main class="content" id="main-content">
       {% if messages %}<div class="flash-stack">{% for message in messages %}<div class="flash {{ message.tags }}" role="status">{{ message }}<button class="flash-dismiss" type="button" data-dismiss aria-label="Close">×</button></div>{% endfor %}</div>{% endif %}
-      <div class="integration-notice"><span class="notice-dot"></span><span>{% if omada_paid_pilot_enabled %}WorldLink-approved Wi-Fi payment route configured. Access is authorized only after EvPay confirms each payment; inventory vouchers are not Omada login codes.{% else %}Router payment activation is awaiting WorldLink approval. Inventory vouchers do not automatically grant Omada internet access.{% endif %}</span></div>
+      {% if not platform_area %}<div class="integration-notice"><span class="notice-dot"></span><span>{% if omada_paid_pilot_enabled %}WorldLink-approved Wi-Fi payment route configured. Access is authorized only after EvPay confirms each payment; inventory vouchers are not Omada login codes.{% else %}Router payment activation is awaiting WorldLink approval. Inventory vouchers do not automatically grant Omada internet access.{% endif %}</span></div>{% endif %}
       {% block content %}{% endblock %}
       <footer class="footer"><span>© 2026 {{ platform_brand.name|default:'WORLDLINK SECURITY SYSTEMS' }}</span><span>WorldLink Hotspot Cloud · v0.9</span></footer>
     </main>

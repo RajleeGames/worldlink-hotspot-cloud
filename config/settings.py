@@ -1,5 +1,6 @@
 import os
 import ipaddress
+import hashlib
 from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 from .env import load_environment
@@ -75,6 +76,10 @@ MEDIA_ROOT = Path(os.environ.get('MEDIA_ROOT_PATH', str(BASE_DIR / 'media')))
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+# Content fingerprints make the browser fetch new CSS/JS after every deployment,
+# even when Nginx or Cloudflare caches /static/ with a long lifetime.
+APP_CSS_VERSION = hashlib.sha256((BASE_DIR / 'static/css/app.css').read_bytes()).hexdigest()[:12]
+APP_JS_VERSION = hashlib.sha256((BASE_DIR / 'static/js/app.js').read_bytes()).hexdigest()[:12]
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'cloud:dashboard'

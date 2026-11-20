@@ -5,6 +5,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -76,6 +77,9 @@ class MultiBusinessPaymentGateTests(TestCase):
         self.assertEqual(page.headers['Referrer-Policy'], 'same-origin')
         self.assertContains(page, 'WorldLink')
         self.assertContains(page, 'Live Wi-Fi payment authorization')
+        self.assertContains(page, f'/static/css/app.css?v={settings.APP_CSS_VERSION}')
+        self.assertContains(page, f'/static/js/app.js?v={settings.APP_JS_VERSION}')
+        self.assertNotContains(page, 'Router payment activation is awaiting WorldLink approval')
 
     def test_online_check_and_explicit_attestation_required(self):
         self.enable()
