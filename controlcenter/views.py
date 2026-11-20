@@ -4,14 +4,15 @@ from django.core.exceptions import PermissionDenied
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Q, Sum
 from django.http import HttpResponseNotAllowed
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from tenants.models import Company, Membership
-from networks.models import OmadaOnboarding, Router, WifiPlan
+from networks.forms import OmadaCentralAssignmentForm
+from networks.models import OmadaDeviceObservation, OmadaManagedSite, OmadaOnboarding, Router, WifiPlan
 from vouchers.models import Voucher, ManualSale
 from hotspots.models import HotspotSession, HotspotCustomer
 from .auth import platform_required, platform_can_manage
@@ -48,13 +49,16 @@ def overview(request):
 def router_onboardings(request):
     """WorldLink-only intake queue; does not connect to customer hardware."""
     records = OmadaOnboarding.objects.filter(router__family=Router.Family.OMADA).select_related(
-        'router__company', 'router__location', 'reviewed_by',
+        'router__company', 'router__location', 'reviewed_by', 'managed_site',
     ).order_by('-updated_at')
-    return render(request, 'controlcenter/router_onboardings.html', {
+    response = render(request, 'controlcenter/router_onboardings.html', {
         'page_title': 'Omada router requests',
         'records': Paginator(records, 30).get_page(request.GET.get('page')),
         'can_manage_platform': platform_can_manage(request.user),
     })
+    response['Referrer-Policy'] = 'same-origin'
+    response['Cache-Control'] = 'private, no-store'
+    return response
 
 
 @platform_required(manage=True)
@@ -76,15 +80,51 @@ def review_router_onboarding(request, pk):
     if len(note) > 400 or (action == 'needs_info' and not note):
         messages.error(request, 'A request for more information needs a note (max 400 characters).')
         return redirect('controlcenter:router_onboardings')
+    if action == 'reviewed' and profile.connection_mode == OmadaOnboarding.ConnectionMode.CENTRAL:
+        assignment = OmadaCentralAssignmentForm(request.POST)
+        if not assignment.is_valid():
+            messages.error(request, 'Central site mapping is incomplete or invalid. Enter site name, Inform omadacId and Open API siteId.')
+            return redirect('controlcenter:router_onboardings')
+        data = assignment.cleaned_data
+        # Never assign one AP to two active businesses, even if both submit it.
+        if OmadaOnboarding.objects.filter(
+            status=OmadaOnboarding.Status.REVIEWED, ap_mac__iexact=profile.ap_mac,
+        ).exclude(pk=profile.pk).exists():
+            messages.error(request, 'This AP MAC is already assigned to a reviewed router. Resolve the conflict first.')
+            return redirect('controlcenter:router_onboardings')
+        site = OmadaManagedSite.objects.select_for_update().filter(
+            inform_site_id=data['inform_site_id'],
+        ).first()
+        if site:
+            if (site.company_id != profile.router.company_id
+                    or site.openapi_site_id != data['openapi_site_id']):
+                messages.error(request, 'That central site belongs to another business or has a different Open API ID.')
+                return redirect('controlcenter:router_onboardings')
+        else:
+            if OmadaManagedSite.objects.filter(openapi_site_id=data['openapi_site_id']).exists():
+                messages.error(request, 'That Open API site ID is already assigned elsewhere.')
+                return redirect('controlcenter:router_onboardings')
+            try:
+                with transaction.atomic():
+                    site = OmadaManagedSite.objects.create(
+                        company=profile.router.company, name=data['site_name'],
+                        inform_site_id=data['inform_site_id'], openapi_site_id=data['openapi_site_id'],
+                    )
+            except IntegrityError:
+                messages.error(request, 'Another WorldLink review assigned this site first. Refresh and verify its ownership.')
+                return redirect('controlcenter:router_onboardings')
+        profile.managed_site = site
     profile.status = (OmadaOnboarding.Status.NEEDS_INFO if action == 'needs_info'
                       else OmadaOnboarding.Status.REVIEWED)
     profile.review_note = note
     profile.reviewed_by = request.user
     profile.reviewed_at = timezone.now()
-    profile.save(update_fields=['status', 'review_note', 'reviewed_by', 'reviewed_at', 'updated_at'])
+    profile.save(update_fields=['status', 'review_note', 'reviewed_by', 'reviewed_at', 'managed_site', 'updated_at'])
+    OmadaDeviceObservation.objects.filter(router_id=profile.router_id).delete()
     PlatformAudit.objects.create(
         actor=request.user, company=profile.router.company, action='OMADA_INTAKE_REVIEWED',
-        note=f'Router #{profile.router_id}; decision {profile.status}; request #{profile.pk}.',
+        note=f'Router #{profile.router_id}; decision {profile.status}; request #{profile.pk}; '
+             f'central site #{profile.managed_site_id or "none"}.',
     )
     messages.success(request, 'Setup request reviewed. No router or payment settings were changed.')
     return redirect('controlcenter:router_onboardings')

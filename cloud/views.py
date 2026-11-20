@@ -90,7 +90,7 @@ def dashboard(request):
     company=request.active_company
     routers = Router.objects.filter(company=company)
     observations = OmadaDeviceObservation.objects.filter(router__company=company).select_related(
-        'router', 'router__omada_onboarding',
+        'router', 'router__omada_onboarding__managed_site',
     )
     fresh_observations = [obs for obs in observations if obs.is_fresh]
     if any(obs.state == OmadaDeviceObservation.State.CONNECTED for obs in fresh_observations):
@@ -119,7 +119,7 @@ def dashboard(request):
         'evpay_confirmed_count':EvPayCollection.objects.filter(company=company, status__in=EARNING_STATUSES).count(),
         'total_expenses':Expense.objects.filter(company=company).aggregate(total=Sum('amount'))['total'] or 0,
         'recent_sales':ManualSale.objects.filter(company=company).select_related('voucher__batch__plan','recorded_by')[:6],
-        'recent_routers':routers.select_related('location', 'omada_onboarding', 'omada_observation')[:5],
+        'recent_routers':routers.select_related('location', 'omada_onboarding__managed_site', 'omada_observation')[:5],
         'hotspot_customer_count':HotspotCustomer.objects.filter(company=company).count(),
         'online_session_count':HotspotSession.objects.filter(company=company).filter(HotspotSession.online_filter()).count(),
         'recent_sessions':HotspotSession.objects.filter(company=company).select_related('router','plan','customer')[:5],

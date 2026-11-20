@@ -2,12 +2,13 @@
 {% block content %}
 <div class="page-heading">
   <div><p class="eyebrow">WORLDLINK · NETWORK OPERATIONS</p><h1>Omada onboarding requests</h1>
-    <p>Review customer-provided details before arranging private access and hardware tests.</p></div>
+    <p>Each customer submits their AP details. WorldLink assigns a separate central Omada site and verifies the hardware.</p></div>
   <a class="button button-secondary" href="{% url 'controlcenter:overview' %}">← Control Center</a>
 </div>
 <div class="integration-notice important">
-  A reviewed request is not a connected router. This screen does not log in to a controller, store passwords,
-  modify payment permissions, or enable internet activation.
+  First create a business site in the central Omada controller. Copy its device Inform URL <strong>omadacId</strong>
+  and its separate <strong>Open API siteId</strong> from the read-only sites list. Reviewing this request does not adopt
+  the AP, change payment permissions, or activate internet.
 </div>
 <section class="panel">
   <div class="table-wrap"><table class="data-table"><thead><tr>
@@ -16,18 +17,27 @@
     {% for item in records %}
     <tr>
       <td><strong>{{ item.router.company.name }}</strong><small class="cell-sub">{{ item.router.name }} · {{ item.router.location.name }}</small></td>
-      <td><strong>{{ item.ssid_name|default:'SSID not provided' }}</strong><small class="cell-sub mono">AP {{ item.ap_mac|default:'Not provided' }}</small><small class="cell-sub">Controller ID: {{ item.controller_id|default:'Not provided' }}</small></td>
+      <td><strong>{{ item.ssid_name|default:'SSID not provided' }}</strong><small class="cell-sub mono">AP {{ item.ap_mac|default:'Not provided' }}</small><small class="cell-sub">Serial: {{ item.router.serial|default:'Not provided' }}</small>{% if item.connection_mode == 'VPN' %}<small class="cell-sub">Controller ID: {{ item.controller_id|default:'Not provided' }}</small>{% endif %}</td>
       <td>{{ item.get_connection_mode_display }}<small class="cell-sub">{{ item.controller_origin|default:'URL not provided' }}</small>
         {% if item.setup_notes %}<small class="cell-sub">Customer note: {{ item.setup_notes|truncatechars:180 }}</small>{% endif %}</td>
       <td><span class="pill pending">{{ item.get_status_display }}</span><small class="cell-sub">{{ item.updated_at|date:'d M Y H:i' }}</small>
+        {% if item.managed_site %}<small class="cell-sub">Central site: {{ item.managed_site.name }}</small>{% endif %}
         {% if item.review_note %}<small class="cell-sub">Staff note: {{ item.review_note }}</small>{% endif %}</td>
       <td>
         {% if can_manage_platform and item.status == 'SUBMITTED' %}
         <form method="post" action="{% url 'controlcenter:review_router_onboarding' item.pk %}" class="router-review-form">{% csrf_token %}
           <label for="review-note-{{ item.pk }}">Response (no passwords)</label>
           <input id="review-note-{{ item.pk }}" class="input" type="text" name="note" maxlength="400" placeholder="Optional if reviewed">
+          {% if item.connection_mode == 'CENTRAL' %}
+          <label for="site-name-{{ item.pk }}">Central Omada site name</label>
+          <input id="site-name-{{ item.pk }}" class="input" type="text" name="site_name" maxlength="120" placeholder="e.g. Customer · Main site">
+          <label for="inform-{{ item.pk }}">Site Inform URL omadacId</label>
+          <input id="inform-{{ item.pk }}" class="input mono" type="text" name="inform_site_id" maxlength="80" placeholder="Hex ID from Omada Inform URL">
+          <label for="api-site-{{ item.pk }}">Open API siteId</label>
+          <input id="api-site-{{ item.pk }}" class="input mono" type="text" name="openapi_site_id" maxlength="80" placeholder="From python manage.py list_omada_sites">
+          {% endif %}
           <div class="row-actions"><button type="submit" class="action-button" name="decision" value="needs_info">Request details</button>
-          <button type="submit" class="action-button" name="decision" value="reviewed">Mark reviewed</button></div>
+          <button type="submit" class="action-button" name="decision" value="reviewed">Approve site details</button></div>
         </form>
         {% else %}—{% endif %}
       </td>

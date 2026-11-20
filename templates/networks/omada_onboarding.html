@@ -4,14 +4,14 @@
   <div>
     <p class="eyebrow">NETWORK · TP-LINK OMADA</p>
     <h1>Set up {{ router.name }}</h1>
-    <p>Send your controller details securely for a WorldLink technician to review.</p>
+    <p>Register your access point once. WorldLink will review it and connect it to the central controller.</p>
   </div>
   <a class="button button-secondary" href="{% url 'networks:routers' %}">← Routers</a>
 </div>
 
 <div class="integration-notice important">
-  This is a setup request, not a live connection. Saving or submitting it will not enable payments, open your network,
-  change the AP, or activate customer internet. WorldLink will review each business separately.
+  No VPN, Tailscale or Omada server is required for the recommended WorldLink connection.
+  Approval and router adoption are separate steps. Payments and customer internet are enabled only after additional live testing.
 </div>
 
 {% if profile %}
@@ -19,20 +19,35 @@
   <strong>Current request: {{ profile.get_status_display }}</strong>
   {% if profile.submitted_at %}<p>Sent {{ profile.submitted_at|date:'d M Y H:i' }}.</p>{% endif %}
   {% if profile.review_note %}<p>Message from WorldLink: {{ profile.review_note }}</p>{% endif %}
-  {% if profile.status == 'REVIEWED' %}<p>Details reviewed. A secure controller connection and live activation still need separate approval and testing.</p>{% endif %}
+  {% if profile.status == 'REVIEWED' and profile.connection_mode == 'CENTRAL' %}
+    <p><strong>WorldLink assigned site:</strong> {{ profile.managed_site.name|default:'Awaiting assignment' }}</p>
+    {% if observation.is_fresh %}
+      <p><strong>Live access-point status:</strong> {{ observation.get_state_display }} (checked {{ observation.checked_at|date:'d M Y H:i:s' }}).</p>
+    {% else %}<p><strong>Access point:</strong> Awaiting a recent controller verification.</p>{% endif %}
+    {% if profile.managed_site.inform_url %}
+      <p>For the TP-Link Omada device's <strong>Controller Inform URL</strong>, use the exact site link below. You may need to release the AP from its old controller first.</p>
+      <p class="mono" style="overflow-wrap:anywhere;user-select:all"><strong>{{ profile.managed_site.inform_url }}</strong></p>
+      <p>Keep the AP powered and connected to the internet. WorldLink will see it as pending adoption and finish approval in the Omada controller. Do not share controller admin passwords.</p>
+    {% else %}<p>WorldLink will provide your controller inform link after the central hostname is configured.</p>{% endif %}
+    <p><small>Connected means the AP was seen by the controller; it does not mean paid guest access is enabled.</small></p>
+  {% elif profile.status == 'REVIEWED' %}<p>Details reviewed. A secure controller connection and live activation still need separate approval and testing.</p>{% endif %}
 </div>
 {% endif %}
 
 <div class="wallet-columns">
   <section class="panel">
-    <div class="panel-heading"><div><h2>Controller and guest Wi-Fi</h2><p>Only non-secret details belong here. Never enter a password or API key.</p></div></div>
+    <div class="panel-heading"><div><h2>Access point and guest Wi-Fi</h2><p>Choose WorldLink central Omada for the easiest setup. No password or API key needed.</p></div></div>
     <form method="post" class="form-grid" autocomplete="off">{% csrf_token %}
       {% for field in form %}
+      {% if field.name == 'controller_origin' %}<details class="span-2" {% if form.connection_mode.value == 'VPN' %}open{% endif %}>
+        <summary>Advanced: I already operate my own Omada controller</summary><div class="form-grid">{% endif %}
       <div class="field {% if field.name == 'setup_notes' or field.name == 'connection_mode' %}span-2{% endif %}">
         <label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
+        {% if field.name == 'controller_origin' or field.name == 'controller_id' %}<small class="field-hint">Only for businesses connecting a separate private controller; leave blank for WorldLink central Omada.</small>{% endif %}
         {% if field.help_text %}<small class="field-hint">{{ field.help_text }}</small>{% endif %}
         {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
       </div>
+      {% if field.name == 'controller_id' %}</div></details>{% endif %}
       {% endfor %}
       {% if form.non_field_errors %}<div class="field-error">{{ form.non_field_errors }}</div>{% endif %}
       <div class="form-actions span-2">
@@ -42,17 +57,16 @@
     </form>
   </section>
   <section class="panel">
-    <div class="panel-heading"><div><h2>How setup works</h2><p>Designed for customers in different locations.</p></div></div>
+    <div class="panel-heading"><div><h2>Four simple steps</h2><p>Works for businesses in different locations.</p></div></div>
     <ol class="router-steps">
-      <li>Register your Omada access point under <strong>Routers</strong>. Each business manages only its own devices.</li>
-      <li>Enter the exact guest Wi-Fi SSID and AP MAC from the Omada Controller.</li>
-      <li>If you already have secure private controller access, select <strong>private HTTPS/VPN</strong> and enter the controller origin and ID. Do not publish TCP port 8043 on the internet.</li>
-      <li>If you are far away or behind carrier NAT, select <strong>Help me connect</strong> and describe your network. A technician will advise on a secure connection method.</li>
-      <li>Click <strong>Request WorldLink review</strong>. The team can request more information before the router is connected.</li>
+      <li>Add your <strong>TP-Link Omada</strong> router, model and serial number from its label in <strong>Routers</strong>.</li>
+      <li>Select <strong>WorldLink central Omada</strong>, enter the AP MAC from the label and the guest Wi-Fi name you want.</li>
+      <li>Send for review. WorldLink creates or assigns a separate site for your business and provides a controller Inform URL.</li>
+      <li>Enter the Inform URL in your Omada AP's controller settings (or ask our team for help). WorldLink adopts the AP, checks online status and then separately tests paid Wi-Fi.</li>
     </ol>
     <div class="router-notice"><strong>Important:</strong> This onboarding form is not a hotspot operator login.
       WorldLink will never ask you to paste router, controller or EvPay passwords here.
-      Existing Eaglelink live payment settings are not modified by this request.</div>
+      Each business has its own site. A new request cannot collect live customer payments or enable access by itself.</div>
   </section>
 </div>
 {% endblock %}

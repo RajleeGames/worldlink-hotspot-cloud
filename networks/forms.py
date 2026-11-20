@@ -49,6 +49,19 @@ class RouterForm(BaseStyledForm):
             raise forms.ValidationError('Choose a valid port from 1 to 65535.')
         return port
 
+    def clean(self):
+        data = super().clean()
+        if data.get('family') == Router.Family.OMADA:
+            for field in ('model_name', 'serial'):
+                if (self.instance.pk and self.instance.family == Router.Family.OMADA
+                        and not getattr(self.instance, field, '')):
+                    # Legacy registered routers may lack label metadata; do
+                    # not block editing their other fields during migration.
+                    continue
+                if not (data.get(field) or '').strip():
+                    self.add_error(field, 'Required for a remote Omada access point. Find it on the device label.')
+        return data
+
 
 class MikroTikLoginForm(forms.Form):
     username = forms.CharField(max_length=80, label='RouterOS username')
@@ -128,14 +141,48 @@ class OmadaOnboardingForm(BaseStyledForm):
 
     def clean(self):
         data = super().clean()
+        if data.get('connection_mode') == OmadaOnboarding.ConnectionMode.CENTRAL:
+            # A central onboarding request must not retain a user URL/ID.
+            data['controller_origin'] = ''
+            data['controller_id'] = ''
         if self.submit:
-            if data.get('connection_mode') == OmadaOnboarding.ConnectionMode.VPN:
+            if data.get('connection_mode') == OmadaOnboarding.ConnectionMode.CENTRAL:
+                for name in ('ap_mac', 'ssid_name'):
+                    if not data.get(name):
+                        self.add_error(name, 'Required to connect this AP to WorldLink central Omada.')
+            elif data.get('connection_mode') == OmadaOnboarding.ConnectionMode.VPN:
                 for name in ('controller_origin', 'controller_id', 'ap_mac', 'ssid_name'):
                     if not data.get(name):
                         self.add_error(name, 'Required for a private controller connection request.')
             elif not data.get('setup_notes') and not data.get('ssid_name'):
                 self.add_error('setup_notes', 'Describe your router or Wi-Fi setup so WorldLink can help you.')
         return data
+
+
+class OmadaCentralAssignmentForm(forms.Form):
+    """WorldLink-only site mapping. The IDs are not customer editable."""
+
+    site_name = forms.CharField(max_length=120, label='Central Omada site name')
+    inform_site_id = forms.CharField(max_length=80, label='Site inform ID (omadacId)')
+    openapi_site_id = forms.CharField(max_length=80, label='Open API siteId')
+
+    def clean_inform_site_id(self):
+        value = self.cleaned_data['inform_site_id'].strip().lower()
+        if not re.fullmatch(r'[a-f0-9]{16,64}', value):
+            raise forms.ValidationError('Copy the 16–64-character hexadecimal omadacId from this site’s Inform URL.')
+        return value
+
+    def clean_openapi_site_id(self):
+        value = self.cleaned_data['openapi_site_id'].strip()
+        if not re.fullmatch(r'[A-Za-z0-9_-]{1,80}', value):
+            raise forms.ValidationError('Copy the exact siteId from the read-only Omada Open API sites list.')
+        return value
+
+    def clean_site_name(self):
+        name = self.cleaned_data['site_name'].strip()
+        if not name:
+            raise forms.ValidationError('Name this customer’s site on the central controller.')
+        return name
 
 class WifiPlanForm(BaseStyledForm):
     class Meta:

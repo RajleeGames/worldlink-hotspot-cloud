@@ -222,3 +222,11 @@ notes, including production requirements.
 ## EvPay payment gateway pilot (v0.8)
 
 See [RELEASE_NOTES_v0.8.md](RELEASE_NOTES_v0.8.md) for sandbox credentials, webhook setup, launch/test commands and production safety requirements. This is a **single-business test lab**, not yet automated public Wi-Fi billing.
+
+## Central Omada onboarding for multiple businesses
+
+See [WORLDLINK_CENTRAL_OMADA_MULTI_BUSINESS_GUIDE.md](WORLDLINK_CENTRAL_OMADA_MULTI_BUSINESS_GUIDE.md).
+Businesses can register Omada access points, request an independent central-controller site,
+receive a WorldLink-reviewed Inform URL, and view **fresh read-only** AP connectivity.
+Staff approval does not adopt a device, grant Wi-Fi access, or authorize new businesses
+to charge the WorldLink EvPay merchant account; those require separate verified setup.

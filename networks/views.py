@@ -8,13 +8,13 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 from tenants.utils import require_tenant
 from vouchers.models import Voucher
-from .models import Location, OmadaOnboarding, Router, RouterVoucherSync, WifiPlan
+from .models import Location, OmadaDeviceObservation, OmadaOnboarding, Router, RouterVoucherSync, WifiPlan
 from .forms import LocationForm, MikroTikLoginForm, OmadaOnboardingForm, RouterForm, WifiPlanForm
 from .mikrotik import MikroTikClient, RouterConnectionError
 
 @require_tenant()
 def router_list(request):
-    routers = Router.objects.filter(company=request.active_company).select_related('location', 'omada_onboarding', 'omada_observation').annotate(
+    routers = Router.objects.filter(company=request.active_company).select_related('location', 'omada_onboarding__managed_site', 'omada_observation').annotate(
         synced_vouchers=Count('voucher_syncs')
     )
     return render(request, 'networks/routers.html', {'routers': routers, 'page_title': 'Routers'})
@@ -122,13 +122,16 @@ def omada_onboarding(request, pk):
             profile.reviewed_at = None
             profile.reviewed_by = None
             profile.review_note = ''
+            profile.managed_site = None
             profile.save()
+            OmadaDeviceObservation.objects.filter(router=router).delete()
             messages.success(request, 'Omada setup request sent to WorldLink for review.' if action == 'submit'
                              else 'Omada setup draft saved. No controller settings were changed.')
             return redirect('networks:omada_onboarding', pk=router.pk)
 
     response = render(request, 'networks/omada_onboarding.html', {
         'router': router, 'profile': saved_profile, 'form': form,
+        'observation': OmadaDeviceObservation.objects.filter(router=router).first(),
         'page_title': f'Connect {router.name} · Omada',
     })
     # Do not suppress the same-origin Referer needed by Django CSRF checks.

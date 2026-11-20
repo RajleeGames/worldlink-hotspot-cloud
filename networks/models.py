@@ -42,6 +42,44 @@ class Router(models.Model):
         return self.name
 
 
+class OmadaManagedSite(models.Model):
+    """WorldLink-assigned central-controller site, never editable by tenants.
+
+    The inform ID is from Omada's device-inform URL. Open API uses a separate
+    site ID; the two must not be assumed equal.
+    """
+
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, related_name='omada_managed_sites')
+    name = models.CharField(max_length=120)
+    inform_site_id = models.CharField(max_length=80, unique=True)
+    openapi_site_id = models.CharField(max_length=80, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['company_id', 'name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['openapi_site_id'],
+                condition=~models.Q(openapi_site_id=''),
+                name='whc_omada_unique_openapi_site',
+            ),
+        ]
+
+    @property
+    def inform_url(self):
+        """Only WorldLink's explicitly configured hostname is ever published."""
+        import re
+        host = getattr(settings, 'OMADA_CENTRAL_INFORM_HOST', '')
+        if not re.fullmatch(r'[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?', host):
+            return ''
+        if not re.fullmatch(r'[0-9a-fA-F]{16,64}', self.inform_site_id):
+            return ''
+        return f'omada://{host}?dPort=29810&mPort=29814&omadacId={self.inform_site_id}'
+
+    def __str__(self):
+        return f'{self.company.name}: {self.name}'
+
+
 class OmadaOnboarding(models.Model):
     """Per-router setup request. Never grants access to a controller by itself.
 
@@ -56,11 +94,16 @@ class OmadaOnboarding(models.Model):
         REVIEWED = 'REVIEWED', 'Details reviewed — connection pending'
 
     class ConnectionMode(models.TextChoices):
+        CENTRAL = 'CENTRAL', 'Connect to WorldLink central Omada (recommended)'
         VPN = 'VPN', 'I have a private HTTPS/VPN controller address'
         ASSISTED = 'ASSISTED', 'Help me connect my controller securely'
 
     router = models.OneToOneField(Router, on_delete=models.CASCADE, related_name='omada_onboarding')
-    connection_mode = models.CharField(max_length=12, choices=ConnectionMode.choices, default=ConnectionMode.ASSISTED)
+    connection_mode = models.CharField(max_length=12, choices=ConnectionMode.choices, default=ConnectionMode.CENTRAL)
+    managed_site = models.ForeignKey(
+        OmadaManagedSite, on_delete=models.PROTECT, null=True, blank=True,
+        related_name='approved_router_requests',
+    )
     controller_origin = models.URLField(max_length=255, blank=True, help_text='HTTPS VPN origin only, no /hotspot.html, credentials, or public port forwarding.')
     controller_id = models.CharField(max_length=80, blank=True, help_text='Copy only the omadacId value from Omada’s URL, not the entire URL or a password.')
     ap_mac = models.CharField(max_length=17, blank=True, help_text='Access point MAC, for example B8-FB-B3-79-B5-60.')
@@ -102,9 +145,13 @@ class OmadaDeviceObservation(models.Model):
             return False
         from payments.omada import normalize_mac
         profile = getattr(self.router, 'omada_onboarding', None)
+        if (self.router.family != Router.Family.OMADA or not profile
+                or profile.status != OmadaOnboarding.Status.REVIEWED or not profile.reviewed_by_id):
+            return False
+        if profile.connection_mode == OmadaOnboarding.ConnectionMode.CENTRAL:
+            return bool(profile.managed_site_id and profile.managed_site.company_id == self.router.company_id
+                        and profile.managed_site.openapi_site_id and profile.ap_mac and profile.ssid_name)
         if (not settings.OMADA_LIVE_ENABLED or self.router.company_id != settings.OMADA_PILOT_COMPANY_ID
-                or self.router.family != Router.Family.OMADA or not profile
-                or profile.status != OmadaOnboarding.Status.REVIEWED or not profile.reviewed_by_id
                 or profile.connection_mode != OmadaOnboarding.ConnectionMode.VPN
                 or profile.controller_origin.rstrip('/') != settings.OMADA_CONTROLLER_URL.rstrip('/')
                 or profile.controller_id != settings.OMADA_CONTROLLER_ID

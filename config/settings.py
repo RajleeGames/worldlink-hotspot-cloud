@@ -146,7 +146,11 @@ OMADA_CA_FILE = os.environ.get('OMADA_CA_FILE', '')
 OMADA_AP_MAC = os.environ.get('OMADA_AP_MAC', '').upper()
 OMADA_SSID = os.environ.get('OMADA_SSID', '')
 
-# Optional, read-only Open API monitoring of the EXISTING single-company pilot.
+# Public *device inform* hostname on the central controller, not a login URL.
+# Assigned to customers only after WorldLink reviews their Omada request.
+OMADA_CENTRAL_INFORM_HOST = os.environ.get('OMADA_CENTRAL_INFORM_HOST', '').strip()
+
+# Optional, read-only Open API monitoring (pilot and approved central sites).
 # Keep credentials on the VPS, never in tenant forms or version control.
 OMADA_OPENAPI_CLIENT_ID = os.environ.get('OMADA_OPENAPI_CLIENT_ID', '').strip()
 OMADA_OPENAPI_CLIENT_SECRET = os.environ.get('OMADA_OPENAPI_CLIENT_SECRET', '').strip()

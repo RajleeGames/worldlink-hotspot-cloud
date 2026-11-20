@@ -1,4 +1,4 @@
-"""Strictly read-only Omada Open API monitoring for the single approved pilot.
+"""Strictly read-only Omada Open API monitoring for reviewed routers.
 
 This does NOT configure an AP, approve a business, or authorize Wi-Fi clients.
 Only the controller URL and credentials configured by WorldLink on the VPS
@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, ProxyHandler, Request, build_opener
 
 from django.conf import settings
+from django.db.models import F
 from django.utils import timezone
 
 from payments.omada import normalize_mac
@@ -156,11 +157,17 @@ class OmadaReadOnlyClient:
                 return found
         raise OmadaMonitorError('Omada result was too large to verify completely.')
 
-    def _site_id(self, auth):
+    def visible_sites(self):
+        """Read-only site inventory for trusted VPS staff (never exposed to tenants)."""
+        return self._pages('sites', self._authorization(), self.MAX_SITE_PAGES)
+
+    def _site_id(self, auth, requested_site_id=None):
         sites = self._pages('sites', auth, self.MAX_SITE_PAGES)
         ids = [row.get('siteId', row.get('id')) for row in sites]
         ids = [site for site in ids if isinstance(site, str) and _safe_id(site)]
-        requested = settings.OMADA_OPENAPI_SITE_ID
+        requested = requested_site_id or settings.OMADA_OPENAPI_SITE_ID
+        if requested_site_id and not _safe_id(requested_site_id):
+            raise OmadaMonitorError('The assigned Omada Open API site ID is invalid.')
         if requested:
             if requested not in ids:
                 raise OmadaMonitorError('The configured Omada site is not visible to the read-only credential.')
@@ -169,11 +176,11 @@ class OmadaReadOnlyClient:
             raise OmadaMonitorError('Select one authorized site using OMADA_OPENAPI_SITE_ID.')
         return ids[0]
 
-    def get_ap_state(self, mac):
-        """Retrieve the single AP state. Never issue a device or Wi-Fi write."""
+    def get_ap_state(self, mac, *, site_id=None):
+        """Retrieve one AP state within the exact authorized site. No writes."""
         target = normalize_mac(mac)
         auth = self._authorization()
-        site_id = self._site_id(auth)
+        site_id = self._site_id(auth, requested_site_id=site_id)
         devices = self._pages(f'sites/{site_id}/devices', auth, self.MAX_DEVICE_PAGES)
         for device in devices:
             candidate = device.get('mac', device.get('macAddress', device.get('deviceMac')))
@@ -231,3 +238,50 @@ def poll_approved_pilot():
         'state': state, 'reported_status': reported, 'checked_at': timezone.now(),
     })
     return obs
+
+
+def approved_managed_routers():
+    """Explicitly staff-mapped APs only; no tenant-provided API destinations."""
+    return Router.objects.filter(
+        family=Router.Family.OMADA,
+        omada_onboarding__status=OmadaOnboarding.Status.REVIEWED,
+        omada_onboarding__reviewed_by__isnull=False,
+        omada_onboarding__connection_mode=OmadaOnboarding.ConnectionMode.CENTRAL,
+        omada_onboarding__managed_site__isnull=False,
+        omada_onboarding__managed_site__company_id=F('company_id'),
+    ).select_related('omada_onboarding__managed_site').order_by('pk')
+
+
+def poll_approved_managed(limit=50):
+    """Observe independently approved APs. Failures never retain green status."""
+    if not 1 <= limit <= 200:
+        raise OmadaMonitorError('Choose a limit from 1 to 200.')
+    routers = list(approved_managed_routers()[:limit])
+    if not routers:
+        return []
+    # One trusted controller endpoint and credential, never URLs from a tenant.
+    try:
+        client = OmadaReadOnlyClient()
+    except OmadaMonitorError:
+        for router in routers:
+            OmadaDeviceObservation.objects.update_or_create(router=router, defaults={
+                'state': OmadaDeviceObservation.State.ERROR, 'reported_status': '',
+                'checked_at': timezone.now(),
+            })
+        raise
+    results = []
+    for router in routers:
+        profile = router.omada_onboarding
+        try:
+            if not profile.ap_mac or not profile.ssid_name or not profile.managed_site.openapi_site_id:
+                raise OmadaMonitorError('Approved AP is missing required central-site details.')
+            state, reported = client.get_ap_state(
+                profile.ap_mac, site_id=profile.managed_site.openapi_site_id,
+            )
+        except (OmadaMonitorError, ValueError):
+            state, reported = OmadaDeviceObservation.State.ERROR, ''
+        observation, _ = OmadaDeviceObservation.objects.update_or_create(router=router, defaults={
+            'state': state, 'reported_status': reported, 'checked_at': timezone.now(),
+        })
+        results.append(observation)
+    return results
