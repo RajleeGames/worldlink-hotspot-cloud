@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -173,6 +173,18 @@ class CollectionSafetyTests(TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertNotContains(response, 'Pay with mobile money')
 
+    def test_checkout_requires_csrf_and_allows_same_origin_https_referer(self):
+        checkout = reverse('portal:evpay_checkout', args=[self.company.slug, self.plan.pk])
+        browser = Client(enforce_csrf_checks=True)
+        response = browser.get(checkout, secure=True)
+        self.assertContains(response, '<meta name="referrer" content="same-origin">')
+        self.assertEqual(browser.post(checkout, {}, secure=True).status_code, 403)
+        token = browser.cookies['csrftoken'].value
+        response = browser.post(checkout, {'csrfmiddlewaretoken': token}, secure=True,
+                                HTTP_REFERER='https://testserver' + checkout)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(EvPayCollection.objects.count(), 0)
+
     def test_finance_clearance_requires_real_evidence_and_never_credits_twice(self):
         obj = self._collection()
         self._event(obj)
@@ -203,3 +215,27 @@ class CollectionSafetyTests(TestCase):
         obj.refresh_from_db()
         self.assertEqual(obj.status, 'SUCCESS')
         self.assertIsNone(obj.omada_activated_at)
+
+    def test_fast_reconcile_checks_recent_payment_and_never_recharges(self):
+        obj = self._collection()
+        EvPayCollection.objects.filter(pk=obj.pk).update(
+            status='PENDING', created_at=timezone.now() - timedelta(seconds=8))
+        result = {'customReference': obj.reference, 'status': 'SUCCESS',
+                  'amount': 500, 'currency': 'TZS'}
+        with patch('payments.management.commands.reconcile_evpay_collections.retrieve_ussd',
+                   return_value=result) as check, patch('payments.evpay.initiate_collection') as push:
+            call_command('reconcile_evpay_collections', '--fast')
+            check.assert_called_once_with(obj.reference)
+            push.assert_not_called()
+        obj.refresh_from_db()
+        self.assertEqual(obj.status, 'SUCCESS')
+        self.assertIsNone(obj.omada_activated_at)
+
+    def test_fast_reconcile_respects_per_payment_backoff(self):
+        obj = self._collection()
+        EvPayCollection.objects.filter(pk=obj.pk).update(
+            status='PENDING', created_at=timezone.now() - timedelta(seconds=8),
+            last_checked_at=timezone.now())
+        with patch('payments.management.commands.reconcile_evpay_collections.retrieve_ussd') as check:
+            call_command('reconcile_evpay_collections', '--fast')
+            check.assert_not_called()

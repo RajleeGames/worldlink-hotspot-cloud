@@ -1,5 +1,6 @@
 """Authenticated EvPay customer callbacks and tenant-scoped review views."""
 import json
+import logging
 import re
 import secrets
 
@@ -19,6 +20,8 @@ from .evpay import EvPayError, retrieve_ussd, verify_webhook
 from .evpay_lab import EVENT_STATUSES
 from .models import EvPayCollection
 
+logger = logging.getLogger(__name__)
+
 
 @csrf_exempt
 @require_POST
@@ -28,10 +31,14 @@ def webhook(request, token):
     secret = settings.EVPAY_WEBHOOK_SECRET
     if (not expected or not secret or not settings.EVPAY_ENABLED or
             not secrets.compare_digest(token, expected)):
+        logger.warning('EvPay collection webhook rejected: route token or configuration mismatch.')
         return JsonResponse({'error': 'Forbidden'}, status=401)
     raw = request.body
     if len(raw) > 200000 or not verify_webhook(raw,
             request.headers.get('X-EvPay-Signature', ''), secret):
+        logger.warning('EvPay collection webhook rejected: %s.',
+            'missing signature header' if not request.headers.get('X-EvPay-Signature')
+            else 'invalid signature or timestamp')
         return JsonResponse({'error': 'Invalid signature'}, status=401)
     delivery_id = request.headers.get('X-EvPay-Delivery', '')
     event_header = request.headers.get('X-EvPay-Event', '')
