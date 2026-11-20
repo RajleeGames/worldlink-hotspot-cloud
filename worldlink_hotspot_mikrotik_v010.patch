@@ -1,0 +1,989 @@
+diff --git a/.env.example b/.env.example
+index ad0895d..4c07117 100644
+--- a/.env.example
++++ b/.env.example
+@@ -30,3 +30,10 @@ EVPAY_SIG_KEY=
+ EVPAY_WEBHOOK_SECRET=
+ # Random non-secret routing identifier, e.g. generate with secrets.token_urlsafe(24).
+ EVPAY_WEBHOOK_TOKEN=
++
++# MikroTik RouterOS v7 pilot: explicit LAN/VPN IP allowlist (NO public IP access).
++# Example: MIKROTIK_ALLOWED_CIDRS=192.168.88.1/32
++# Leave empty until you know the device's real private management address.
++MIKROTIK_ALLOWED_CIDRS=
++# Optional: trusted router certificate-authority PEM path for HTTPS verification.
++MIKROTIK_CA_FILE=
+diff --git a/RELEASE_NOTES_MIKROTIK_v0.10.md b/RELEASE_NOTES_MIKROTIK_v0.10.md
+new file mode 100644
+index 0000000..d181775
+--- /dev/null
++++ b/RELEASE_NOTES_MIKROTIK_v0.10.md
+@@ -0,0 +1,115 @@
++# WorldLink Hotspot Cloud — MikroTik router pilot v0.10
++
++This is an **incremental patch on top of the wallet v0.9 patch**. The ZIP
++contains only a Git patch — no database, passwords, uploads, or .env.
++
++## Owner workflow
++
++1. Open **Network → Routers → Add router**. If no location exists, saving
++   your first router automatically creates a "Main site" location.
++2. Select MikroTik, enter the router's management IP and HTTPS port (443).
++3. Select **Connect & sync**, enter a dedicated RouterOS login and password.
++   These credentials are used for ONE request and not saved in the database.
++4. Select **Test connection**. The page checks RouterOS version and that the
++   built-in HotSpot is enabled. It does not modify router settings.
++5. After a voucher is genuinely sold through the manual-sale flow, select
++   **Sync up to 10 sold vouchers**. The router receives only vouchers in the
++   SOLD state with a recorded manual sale.
++6. A customer connects to the guest SSID and enters the printed code as
++   both username and password on the **MikroTik HotSpot login** page.
++7. Use **View live users** on the same router page to read the current
++   MikroTik HotSpot Active table. The snapshot is read-only and not a
++   persistent, automatically refreshing session monitor.
++
++The adapter creates a dedicated hotspot user and associated plan profile,
++using your plan's bandwidth, shared-user count, accumulated uptime and
++optional total traffic limit. Sync is idempotent and capped at ten vouchers
++per request; repeat for larger queues. Router users/profiles not owned by
++WorldLink are not modified.
++
++**No unpaid checkout request, unverified EvPay payment, READY voucher or
++test-payment transaction is authorized for internet access.**
++
++## Prerequisites for the physical router test
++
++- A real MikroTik gateway with **RouterOS v7**, correctly connected to the
++  internet and with a **HotSpot server enabled** on the guest bridge.
++- RouterOS www-ssl (REST over HTTPS) enabled; restrict it to a trusted private
++  LAN/VPN and NEVER expose it to the public internet.
++- A dedicated RouterOS account with permission to inspect and create HotSpot
++  users/profiles; a trustworthy HTTPS certificate.
++- The Windows Django PC or VPS must have a private network route to the
++  router management IP. For 4G/5G SIM and CGNAT, a private VPN is usually
++  necessary for a remote VPS.
++- In the existing .env, add, for example:
++
++      MIKROTIK_ALLOWED_CIDRS=192.168.88.1/32
++
++  Replace that sample IP with the ACTUAL router management IP. Restart Django
++  to pick up the change. The default empty setting BLOCKS connections.
++  Multiple allowed IPs can be comma-separated.
++- For your own trusted router CA certificate, set MIKROTIK_CA_FILE to a PEM
++  path accessible on the Django host. By default, HTTPS validates using the
++  host CA store. In a strictly local DEBUG test, you may manually opt out of
++  TLS validation using the checkbox. Production cannot disable validation.
++
++Omada and Cudy cannot use this MikroTik connector without separate vendor
++integration. Do not change the router family to trick this restriction.
++
++## Scope and limitations
++
++- **No physical router connection was tested in the development environment.**
++  The code was exercised against simulated RouterOS REST responses and
++  Django's test database only. Test on the customer's hardware before launch.
++- WorldLink's hosted checkout is still a payment request page; it is not
++  the router's captive-login endpoint. MikroTik handles login locally.
++- No live automatic EvPay pay-to-connect or continuous router polling.
++  Manual read-only HotSpot Active snapshots are supported.
++- Uptime limits mean total CONNECTED time, not wall-clock time since first
++  login. No automatic expiry on a fixed calendar date is provided.
++- The guest Wi-Fi must have no bypass path around the hotspot gateway.
++
++## Safe installation — Windows, original project folder ONLY
++
++Stop Django and open the existing folder:
++
++    cd "C:\Users\user\worldlink-projects\worldlink-hotspot-cloud"
++
++1. Make a verified SQLite backup with sqlite3.backup() as instructed in
++   the accompanying answer. Do not overwrite your current db.sqlite3.
++2. Download the v0.10 patch ZIP to Downloads.
++3. Extract it into that SAME project directory. It contains only
++   worldlink_hotspot_mikrotik_v010.patch, no project tree.
++4. Run the safety check first:
++
++    git apply --check .\worldlink_hotspot_mikrotik_v010.patch
++
++   STOP if there is an error. Do not force the patch onto different code.
++5. Only after that check passes, apply:
++
++    git apply .\worldlink_hotspot_mikrotik_v010.patch
++
++6. Run your same venv's manage.py migrate, check and test networks.tests.
++   Then restart Django. The migration only ADDS management port/last-check
++   fields and a voucher-sync table; it does not replace existing data.
++
++No GitHub push, new project directory, database copy or new user account
++is necessary. Your current wallet, users, sessions, vouchers, uploaded
++media, .env and Git history remain in the same project.
++
++## Hardware acceptance test before the customer pays
++
++1. Connect the customer's router to the SAME private network as Django,
++   or to an approved VPN; verify its management IP and HTTPS certificate.
++2. Test connection and verify an actual RouterOS model/version is returned.
++3. Create one test-package voucher and manually record a genuine voucher
++   sale; sync it with the dedicated router login.
++4. Connect a separate phone to guest Wi-Fi. Test the sold code as login.
++5. Check it appears in RouterOS HotSpot Active. Test an unpaid/READY code
++   and verify that one cannot get internet.
++6. Test upload/download limits, data cap, cumulative uptime and users
++   returning after disconnection.
++
++Official MikroTik references:
++https://help.mikrotik.com/docs/spaces/ROS/pages/47579162/REST+API
++https://help.mikrotik.com/docs/spaces/ROS/pages/56459266/HotSpot+-+Captive+portal
+diff --git a/cloud/context_processors.py b/cloud/context_processors.py
+index fd27327..d555e4e 100644
+--- a/cloud/context_processors.py
++++ b/cloud/context_processors.py
+@@ -100,6 +100,16 @@ def build_breadcrumbs(request):
+         if name == 'create': trail.append(('Generate vouchers',None))
+         elif name == 'batch_detail': trail.append(('View batch',None))
+         elif name == 'batch_edit': trail.extend([('View batch',reverse('vouchers:batch_detail',kwargs={'pk':resolver.kwargs['pk']})),('Edit batch',None)])
++    elif namespace == 'networks':
++        trail.append(('Network', None))
++        if name.startswith('router'):
++            trail.append(('Routers', 'networks:routers' if name != 'routers' else None))
++            if name == 'router_connect': trail.append(('Connect MikroTik', None))
++            elif name in ('router_new', 'router_edit'): trail.append(('Router details', None))
++        elif name.startswith('plan'):
++            trail.append(('Wi-Fi packages', 'networks:plans' if name != 'plans' else None))
++        elif name.startswith('location'):
++            trail.append(('Locations', 'networks:locations' if name != 'locations' else None))
+     elif name in ('reports','expenses','expense_new','expense_edit'):
+         trail.append(('Sales',None))
+         if name == 'reports': trail.append(('Sales reports',None))
+diff --git a/config/settings.py b/config/settings.py
+index b8b1352..fbc26f8 100644
+--- a/config/settings.py
++++ b/config/settings.py
+@@ -1,4 +1,5 @@
+ import os
++import ipaddress
+ from pathlib import Path
+ from django.core.exceptions import ImproperlyConfigured
+ from .env import load_environment
+@@ -92,6 +93,14 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https') if flag('TRUST_PRO
+ X_FRAME_OPTIONS = 'DENY'
+ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend'
+ 
++# Opt-in router management only across explicitly authorized private LAN/VPN ranges.
++# Example: MIKROTIK_ALLOWED_CIDRS=192.168.88.1/32,10.8.0.0/24
++MIKROTIK_ALLOWED_CIDRS = tuple(
++    ipaddress.ip_network(item.strip(), strict=False)
++    for item in os.environ.get('MIKROTIK_ALLOWED_CIDRS', '').split(',') if item.strip()
++)
++MIKROTIK_CA_FILE = os.environ.get('MIKROTIK_CA_FILE', '').strip()
++
+ # EvPay pilot (default: OFF). Use one approved merchant for ONE pilot company only.
+ # Do not enable live collections until you have verified sandbox callbacks.
+ EVPAY_ENABLED = flag('EVPAY_ENABLED', False)
+diff --git a/networks/forms.py b/networks/forms.py
+index 773525b..b615950 100644
+--- a/networks/forms.py
++++ b/networks/forms.py
+@@ -27,10 +27,38 @@ class LocationForm(BaseStyledForm):
+ class RouterForm(BaseStyledForm):
+     class Meta:
+         model = Router
+-        fields = ['name', 'location', 'family', 'model_name', 'address', 'serial', 'notes']
++        fields = ['name', 'location', 'family', 'model_name', 'address', 'management_port', 'serial', 'notes']
+     def __init__(self, *args, company, **kwargs):
+         super().__init__(*args, **kwargs)
+         self.fields['location'].queryset = Location.objects.filter(company=company).order_by('name')
++        if not self.fields['location'].queryset.exists():
++            self.fields['location'].required = False
++            self.fields['location'].help_text = 'A "Main site" location will be created when you save.'
++
++    def clean_management_port(self):
++        port = self.cleaned_data['management_port']
++        if not 1 <= port <= 65535:
++            raise forms.ValidationError('Choose a valid port from 1 to 65535.')
++        return port
++
++
++class MikroTikLoginForm(forms.Form):
++    username = forms.CharField(max_length=80, label='RouterOS username')
++    password = forms.CharField(
++        max_length=200, label='RouterOS password',
++        widget=forms.PasswordInput(attrs={'autocomplete': 'off'}),
++    )
++    verify_tls = forms.BooleanField(
++        required=False, initial=True, label='Verify HTTPS certificate',
++        help_text='Required in production. For a local test with a self-signed certificate, '
++                  'you may uncheck this only when Django DEBUG is enabled.',
++    )
++
++    def __init__(self, *args, **kwargs):
++        super().__init__(*args, **kwargs)
++        for field in self.fields.values():
++            if not isinstance(field.widget, forms.CheckboxInput):
++                field.widget.attrs['class'] = 'input'
+ 
+ class WifiPlanForm(BaseStyledForm):
+     class Meta:
+diff --git a/networks/migrations/0002_mikrotik_pilot.py b/networks/migrations/0002_mikrotik_pilot.py
+new file mode 100644
+index 0000000..b812295
+--- /dev/null
++++ b/networks/migrations/0002_mikrotik_pilot.py
+@@ -0,0 +1,47 @@
++from django.conf import settings
++from django.core.validators import MinValueValidator
++from django.db import migrations, models
++import django.db.models.deletion
++
++
++class Migration(migrations.Migration):
++    dependencies = [
++        ('networks', '0001_initial'),
++        ('vouchers', '0001_initial'),
++        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
++    ]
++
++    operations = [
++        migrations.AlterField(
++            model_name='router', name='address',
++            field=models.GenericIPAddressField(
++                blank=True, null=True,
++                help_text='Router management IP reachable from this server over your private LAN/VPN.',
++            ),
++        ),
++        migrations.AddField(
++            model_name='router', name='management_port',
++            field=models.PositiveIntegerField(
++                default=443, validators=[MinValueValidator(1)],
++                help_text='RouterOS HTTPS REST port (normally 443). Never expose it publicly.',
++            ),
++        ),
++        migrations.AddField(
++            model_name='router', name='last_checked_at',
++            field=models.DateTimeField(blank=True, null=True),
++        ),
++        migrations.CreateModel(
++            name='RouterVoucherSync',
++            fields=[
++                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
++                ('synced_at', models.DateTimeField(auto_now_add=True)),
++                ('router', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='voucher_syncs', to='networks.router')),
++                ('voucher', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='router_syncs', to='vouchers.voucher')),
++                ('synced_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)),
++            ],
++        ),
++        migrations.AddConstraint(
++            model_name='routervouchersync',
++            constraint=models.UniqueConstraint(fields=('router', 'voucher'), name='whc_one_voucher_per_router'),
++        ),
++    ]
+diff --git a/networks/mikrotik.py b/networks/mikrotik.py
+new file mode 100644
+index 0000000..5dbe05c
+--- /dev/null
++++ b/networks/mikrotik.py
+@@ -0,0 +1,211 @@
++"""Small, HTTPS-only RouterOS v7 REST adapter for an on-site MikroTik pilot.
++
++Router credentials are accepted for a single request and are never persisted.
++The administrator must explicitly allow-list router management IPs in .env.
++"""
++import base64
++import ipaddress
++import json
++import socket
++import ssl
++from urllib.error import HTTPError, URLError
++from urllib.request import HTTPSHandler, HTTPRedirectHandler, ProxyHandler, Request, build_opener
++
++from django.conf import settings
++
++
++class RouterConnectionError(Exception):
++    """Safe, actionable message that never contains a router password."""
++
++
++def require_allowed_router_ip(address):
++    try:
++        ip = ipaddress.ip_address(address)
++    except (ValueError, TypeError):
++        raise RouterConnectionError("Save a valid router management IP address first.") from None
++    ranges = settings.MIKROTIK_ALLOWED_CIDRS
++    if not ranges:
++        raise RouterConnectionError(
++            "Router connections are disabled. WorldLink's administrator must set "
++            "MIKROTIK_ALLOWED_CIDRS to the exact router LAN/VPN IP (for example 192.168.88.1/32)."
++        )
++    if ip.is_multicast or ip.is_unspecified or ip.is_link_local or ip.is_loopback:
++        raise RouterConnectionError("Loopback, multicast and link-local addresses are not router targets.")
++    if not any(ip in network for network in ranges):
++        raise RouterConnectionError("Router IP is outside the administrator's allowed management networks.")
++    return str(ip)
++
++
++class _NoRedirects(HTTPRedirectHandler):
++    def redirect_request(self, req, fp, code, msg, headers, newurl):
++        raise RouterConnectionError("Router sent a redirect; refusing to forward login credentials.")
++
++
++class MikroTikClient:
++    def __init__(self, router, username, password, *, verify_tls=True):
++        if router.family != "MIKROTIK":
++            raise RouterConnectionError("This pilot connects to MikroTik RouterOS v7 only.")
++        self.ip = require_allowed_router_ip(router.address)
++        self.port = router.management_port
++        if not (1 <= self.port <= 65535):
++            raise RouterConnectionError("Invalid HTTPS management port.")
++        if not username.strip() or not password:
++            raise RouterConnectionError("Enter a dedicated RouterOS username and password.")
++        if ":" in username or "\r" in username or "\n" in username:
++            raise RouterConnectionError("Invalid RouterOS username.")
++        if not verify_tls and not settings.DEBUG:
++            raise RouterConnectionError("TLS certificate verification cannot be disabled in production.")
++        ip_for_url = f"[{self.ip}]" if ":" in self.ip else self.ip
++        self.base = f"https://{ip_for_url}:{self.port}/rest/"
++        auth = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("ascii")
++        self.authorization = f"Basic {auth}"
++        if verify_tls:
++            context = ssl.create_default_context(cafile=settings.MIKROTIK_CA_FILE or None)
++        else:
++            context = ssl._create_unverified_context()  # Debug-only pilot, explicit user opt-in.
++        # No system proxy and no redirects: never send router credentials off target.
++        self.opener = build_opener(ProxyHandler({}), HTTPSHandler(context=context), _NoRedirects())
++
++    def _request(self, path, method="GET", payload=None):
++        if path not in ("system/resource", "ip/hotspot", "ip/hotspot/user",
++                        "ip/hotspot/user/profile", "ip/hotspot/active"):
++            raise RouterConnectionError("Unsupported router operation.")
++        data = json.dumps(payload).encode("utf-8") if payload is not None else None
++        request = Request(
++            self.base + path, data=data, method=method,
++            headers={
++                "Authorization": self.authorization,
++                "Accept": "application/json",
++                "Content-Type": "application/json",
++            },
++        )
++        try:
++            with self.opener.open(request, timeout=7) as response:
++                raw = response.read(2_000_001)
++                if len(raw) > 2_000_000:
++                    raise RouterConnectionError("Router returned too much data. Contact WorldLink support.")
++            return json.loads(raw.decode("utf-8"))
++        except HTTPError as exc:
++            if exc.code == 401:
++                message = "RouterOS rejected the username/password."
++            elif exc.code == 403:
++                message = "RouterOS user does not have the required access."
++            elif exc.code == 404:
++                message = "RouterOS REST API was not found. RouterOS v7 with www-ssl is required."
++            else:
++                message = f"Router returned HTTP {exc.code}. Check its REST service and permissions."
++            raise RouterConnectionError(message) from None
++        except (URLError, OSError, socket.timeout, TimeoutError) as exc:
++            if isinstance(getattr(exc, "reason", None), ssl.SSLCertVerificationError) or isinstance(exc, ssl.SSLCertVerificationError):
++                message = "TLS certificate is not trusted. Install its CA certificate on the server."
++            else:
++                message = "Cannot reach the router. Check its IP, VPN/LAN route and HTTPS management port."
++            raise RouterConnectionError(message) from None
++        except (UnicodeError, ValueError):
++            raise RouterConnectionError("Router did not return valid RouterOS REST JSON.") from None
++
++    def check_ready(self):
++        info = self._request("system/resource")
++        # RouterOS REST returns either a single object or a one-item list,
++        # depending on the endpoint/router release.
++        if isinstance(info, list) and len(info) == 1:
++            info = info[0]
++        if not isinstance(info, dict):
++            raise RouterConnectionError("Router identification response was invalid.")
++        version = str(info.get("version", ""))
++        if not version.startswith("7."):
++            raise RouterConnectionError("This pilot requires MikroTik RouterOS v7.")
++        servers = self._request("ip/hotspot")
++        if not isinstance(servers, list) or not any(
++            row.get("disabled") not in ("true", True) for row in servers
++        ):
++            raise RouterConnectionError(
++                "No enabled MikroTik HotSpot server found. Set up HotSpot on the guest bridge first."
++            )
++        return {
++            "model": str(info.get("board-name", "MikroTik"))[:70],
++            "version": version[:40],
++        }
++
++    @staticmethod
++    def _marked_record(items, name, expected_marker):
++        row = next((item for item in items if item.get("name") == name), None)
++        if row is not None and row.get("comment") != expected_marker:
++            raise RouterConnectionError(
++                f"Router already has a different account/profile named {name}. "
++                "No existing router records were overwritten."
++            )
++        return row
++
++    def active_users(self):
++        """A live, read-only RouterOS snapshot; never silently invent online sessions."""
++        rows = self._request("ip/hotspot/active")
++        if not isinstance(rows, list):
++            raise RouterConnectionError("Router did not return a HotSpot Active list.")
++        return [
++            {
++                "username": str(item.get("user") or "—")[:70],
++                "address": str(item.get("address") or "—")[:70],
++                "uptime": str(item.get("uptime") or "—")[:70],
++            }
++            for item in rows[:60]
++        ], len(rows)
++
++    def sync_sold_vouchers(self, router, actor, *, max_count=20):
++        """Provision at most max_count cleared *manual sales* idempotently."""
++        from .models import RouterVoucherSync
++        from vouchers.models import Voucher
++
++        vouchers = list(
++            Voucher.objects.filter(
++                company=router.company, status=Voucher.Status.SOLD, manual_sale__isnull=False
++            ).exclude(router_syncs__router=router)
++            .select_related("batch__plan")
++            .order_by("pk")[:max_count]
++        )
++        if not vouchers:
++            return 0
++
++        profiles = self._request("ip/hotspot/user/profile")
++        users = self._request("ip/hotspot/user")
++        if not isinstance(profiles, list) or not isinstance(users, list):
++            raise RouterConnectionError("Router HotSpot account list was not readable.")
++        synced = 0
++        for voucher in vouchers:
++            plan = voucher.batch.plan
++            profile_name = f"WHC-P{plan.pk}"
++            profile_marker = f"WorldLink|plan|{plan.pk}"
++            if not self._marked_record(profiles, profile_name, profile_marker):
++                self._request("ip/hotspot/user/profile", "PUT", {
++                    "name": profile_name,
++                    "comment": profile_marker,
++                    "shared-users": str(plan.device_limit),
++                    # RouterOS rate-limit is router Rx (client upload) / Tx (client download).
++                    "rate-limit": f"{plan.upload_kbps}k/{plan.download_kbps}k",
++                })
++                profiles.append({"name": profile_name, "comment": profile_marker})
++
++            marker = f"WorldLink|voucher|{voucher.pk}"
++            if not self._marked_record(users, voucher.code, marker):
++                body = {
++                    "name": voucher.code,
++                    "password": voucher.code,
++                    "profile": profile_name,
++                    "limit-uptime": f"{plan.duration_minutes * 60}s",
++                    "comment": marker,
++                    "disabled": "false",
++                }
++                if plan.data_limit_mb:
++                    body["limit-bytes-total"] = str(plan.data_limit_mb * 1024 * 1024)
++                self._request("ip/hotspot/user", "PUT", body)
++                users.append({"name": voucher.code, "comment": marker})
++
++            # Write only after RouterOS confirms the user exists. The unique
++            # constraint makes retries safe even if a previous HTTP response
++            # succeeded before the database row could be committed.
++            _, created = RouterVoucherSync.objects.get_or_create(
++                router=router, voucher=voucher,
++                defaults={"synced_by": actor},
++            )
++            synced += int(created)
++        return synced
+diff --git a/networks/models.py b/networks/models.py
+index bde1723..5ed5fdd 100644
+--- a/networks/models.py
++++ b/networks/models.py
+@@ -1,4 +1,5 @@
+ from django.db import models
++from django.conf import settings
+ from django.core.validators import MinValueValidator
+ from tenants.models import Company
+ 
+@@ -22,7 +23,15 @@ class Router(models.Model):
+     name = models.CharField(max_length=120)
+     family = models.CharField(max_length=12, choices=Family.choices, default=Family.MIKROTIK)
+     model_name = models.CharField(max_length=100, blank=True)
+-    address = models.GenericIPAddressField(null=True, blank=True, help_text='Inventory only; no connection yet')
++    address = models.GenericIPAddressField(
++        null=True, blank=True,
++        help_text='Router management IP reachable from this server over your private LAN/VPN.',
++    )
++    management_port = models.PositiveIntegerField(
++        default=443, validators=[MinValueValidator(1)],
++        help_text='RouterOS HTTPS REST port (normally 443). Never expose it publicly.',
++    )
++    last_checked_at = models.DateTimeField(null=True, blank=True)
+     serial = models.CharField(max_length=120, blank=True)
+     notes = models.TextField(blank=True)
+     created_at = models.DateTimeField(auto_now_add=True)
+@@ -46,3 +55,16 @@ class WifiPlan(models.Model):
+         ordering = ['-created_at']
+     def __str__(self):
+         return self.name
++
++
++class RouterVoucherSync(models.Model):
++    """Proven RouterOS provisioning for a previously sold, paid-manually voucher."""
++    router = models.ForeignKey(Router, on_delete=models.PROTECT, related_name='voucher_syncs')
++    voucher = models.ForeignKey('vouchers.Voucher', on_delete=models.PROTECT, related_name='router_syncs')
++    synced_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
++    synced_at = models.DateTimeField(auto_now_add=True)
++
++    class Meta:
++        constraints = [
++            models.UniqueConstraint(fields=['router', 'voucher'], name='whc_one_voucher_per_router')
++        ]
+diff --git a/networks/tests.py b/networks/tests.py
+new file mode 100644
+index 0000000..5f567d4
+--- /dev/null
++++ b/networks/tests.py
+@@ -0,0 +1,203 @@
++"""Non-hardware safety checks for the first RouterOS connection pilot."""
++import ipaddress
++from unittest.mock import patch
++
++from django.contrib.auth import get_user_model
++from django.test import TestCase, override_settings
++from django.urls import reverse
++
++from tenants.models import Company, Membership
++from vouchers.models import Voucher, VoucherBatch, ManualSale
++from .mikrotik import MikroTikClient, RouterConnectionError
++from .models import Location, Router, RouterVoucherSync, WifiPlan
++
++User = get_user_model()
++ALLOWED = (ipaddress.ip_network("192.168.88.1/32"),)
++
++
++class RouterPilotTests(TestCase):
++    def setUp(self):
++        self.company = Company.objects.create(name="WorldLink Test Shop")
++        self.other_company = Company.objects.create(name="Other Shop")
++        self.owner = User.objects.create_user(username="pilot-owner@example.com", password="PilotPass!12345")
++        self.other = User.objects.create_user(username="pilot-other@example.com", password="PilotPass!12345")
++        Membership.objects.create(user=self.owner, company=self.company, role="OWNER")
++        Membership.objects.create(user=self.other, company=self.other_company, role="OWNER")
++        self.location = Location.objects.create(company=self.company, name="Main")
++        self.router = Router.objects.create(
++            company=self.company, location=self.location, name="Router A",
++            address="192.168.88.1", management_port=443,
++        )
++        self.plan = WifiPlan.objects.create(
++            company=self.company, name="Hour", duration_minutes=60, price=1000,
++            download_kbps=5000, upload_kbps=1000, data_limit_mb=250, device_limit=2,
++        )
++        self.batch = VoucherBatch.objects.create(
++            company=self.company, plan=self.plan, quantity=2, created_by=self.owner,
++        )
++        self.sold = Voucher.objects.create(company=self.company, batch=self.batch, code="WHC-PAID123456")
++        self.ready = Voucher.objects.create(company=self.company, batch=self.batch, code="WHC-UNPAID1234")
++        self.sold.status = Voucher.Status.SOLD
++        self.sold.save(update_fields=["status"])
++        ManualSale.objects.create(
++            company=self.company, voucher=self.sold, amount=1000,
++            method=ManualSale.PaymentMethod.CASH, recorded_by=self.owner,
++        )
++
++    @staticmethod
++    def fake_api():
++        profiles, users, posts = [], [], []
++
++        def handle(path, method="GET", payload=None):
++            if path == "system/resource":
++                return [{"board-name": "hAP ax2", "version": "7.20.2"}]
++            if path == "ip/hotspot":
++                return [{"name": "hotspot1", "disabled": "false"}]
++            if path == "ip/hotspot/active":
++                return [{"user": "WHC-PAID123456", "address": "10.5.50.100", "uptime": "5m22s"}]
++            if path == "ip/hotspot/user/profile":
++                if method == "GET":
++                    return list(profiles)
++                profiles.append(payload)
++                posts.append(("profile", payload))
++                return {"ret": "*1"}
++            if path == "ip/hotspot/user":
++                if method == "GET":
++                    return list(users)
++                users.append(payload)
++                posts.append(("user", payload))
++                return {"ret": "*2"}
++            raise AssertionError(f"Unexpected router REST operation: {path}")
++
++        return handle, posts
++
++    @override_settings(MIKROTIK_ALLOWED_CIDRS=ALLOWED)
++    def test_test_button_is_read_only_and_no_router_password_persisted(self):
++        fake, posts = self.fake_api()
++        self.client.force_login(self.owner)
++        with patch.object(MikroTikClient, "_request", side_effect=fake):
++            result = self.client.post(
++                reverse("networks:router_connect", args=[self.router.pk]),
++                {"username": "worldlink", "password": "very-private-router-secret",
++                 "verify_tls": "on", "action": "test"},
++            )
++        self.assertEqual(result.status_code, 200)
++        self.assertContains(result, "RouterOS HTTPS connection successful")
++        self.assertNotContains(result, "very-private-router-secret")
++        self.assertEqual(posts, [])
++        self.router.refresh_from_db()
++        self.assertIsNotNone(self.router.last_checked_at)
++        self.assertEqual(RouterVoucherSync.objects.count(), 0)
++
++    @override_settings(MIKROTIK_ALLOWED_CIDRS=ALLOWED)
++    def test_only_confirmed_manual_sale_syncs_and_sync_is_idempotent(self):
++        fake, posts = self.fake_api()
++        self.client.force_login(self.owner)
++        url = reverse("networks:router_connect", args=[self.router.pk])
++        data = {"username": "worldlink", "password": "secret", "verify_tls": "on", "action": "sync"}
++        with patch.object(MikroTikClient, "_request", side_effect=fake):
++            response = self.client.post(url, data)
++            again = self.client.post(url, data)
++        self.assertEqual(response.status_code, 200)
++        self.assertEqual(again.status_code, 200)
++        self.assertEqual(RouterVoucherSync.objects.count(), 1)
++        self.assertEqual(len(posts), 2)
++        profile = next(item for kind, item in posts if kind == "profile")
++        user = next(item for kind, item in posts if kind == "user")
++        self.assertEqual(profile["rate-limit"], "1000k/5000k")
++        self.assertEqual(profile["shared-users"], "2")
++        self.assertEqual(user["name"], self.sold.code)
++        self.assertEqual(user["password"], self.sold.code)
++        self.assertEqual(user["limit-uptime"], "3600s")
++        self.assertEqual(user["limit-bytes-total"], str(250 * 1024 * 1024))
++        self.assertNotEqual(user["name"], self.ready.code)
++
++    @override_settings(MIKROTIK_ALLOWED_CIDRS=ALLOWED)
++    def test_router_existing_unrelated_name_is_never_overwritten(self):
++        fake, posts = self.fake_api()
++
++        def conflicting(path, method="GET", payload=None):
++            if path == "ip/hotspot/user":
++                return [{"name": self.sold.code, "comment": "Local guest"}]
++            return fake(path, method, payload)
++
++        self.client.force_login(self.owner)
++        with patch.object(MikroTikClient, "_request", side_effect=conflicting):
++            response = self.client.post(
++                reverse("networks:router_connect", args=[self.router.pk]),
++                {"username": "test", "password": "secret", "verify_tls": "on", "action": "sync"},
++            )
++        self.assertContains(response, "No existing router records were overwritten")
++        self.assertEqual(RouterVoucherSync.objects.count(), 0)
++        self.assertFalse(any(kind == "user" for kind, _ in posts))
++
++    def test_tenant_isolation_and_roles(self):
++        self.client.force_login(self.other)
++        url = reverse("networks:router_connect", args=[self.router.pk])
++        self.assertEqual(self.client.get(url).status_code, 404)
++        Membership.objects.filter(user=self.owner).update(role="VIEWER")
++        self.client.force_login(self.owner)
++        self.assertEqual(self.client.get(url).status_code, 403)
++        self.assertEqual(self.client.post(url, {"action": "test"}).status_code, 403)
++
++    @override_settings(MIKROTIK_ALLOWED_CIDRS=ALLOWED)
++    def test_live_active_view_reads_router_but_does_not_write_sessions(self):
++        from hotspots.models import HotspotSession
++        fake, posts = self.fake_api()
++        self.client.force_login(self.owner)
++        with patch.object(MikroTikClient, "_request", side_effect=fake):
++            result = self.client.post(
++                reverse("networks:router_connect", args=[self.router.pk]),
++                {"username": "worldlink", "password": "secret", "verify_tls": "on", "action": "online"},
++            )
++        self.assertContains(result, "10.5.50.100")
++        self.assertContains(result, "5m22s")
++        self.assertEqual(posts, [])
++        self.assertEqual(HotspotSession.objects.count(), 0)
++
++    def test_first_router_onboarding_creates_main_site_only_on_save(self):
++        new_company = Company.objects.create(name="Brand New Internet Shop")
++        fresh_owner = User.objects.create_user(username="fresh-owner@example.com", password="PilotPass!12345")
++        Membership.objects.create(user=fresh_owner, company=new_company, role="OWNER")
++        self.client.force_login(fresh_owner)
++        self.assertEqual(Location.objects.filter(company=new_company).count(), 0)
++        self.assertEqual(self.client.get(reverse("networks:router_new")).status_code, 200)
++        self.assertEqual(Location.objects.filter(company=new_company).count(), 0)
++        response = self.client.post(reverse("networks:router_new"), {
++            "name": "First Router", "location": "", "family": "MIKROTIK",
++            "model_name": "hEX S", "address": "192.168.88.1",
++            "management_port": "443", "serial": "", "notes": "",
++        })
++        self.assertEqual(response.status_code, 302)
++        new_router = Router.objects.get(company=new_company)
++        self.assertEqual(new_router.location.name, "Main site")
++        self.assertEqual(Location.objects.filter(company=new_company).count(), 1)
++
++    @override_settings(MIKROTIK_ALLOWED_CIDRS=())
++    def test_no_connection_without_administrator_allowlist(self):
++        with self.assertRaisesRegex(RouterConnectionError, "disabled"):
++            MikroTikClient(self.router, "username", "password")
++
++    @override_settings(MIKROTIK_ALLOWED_CIDRS=ALLOWED, DEBUG=False)
++    def test_no_unverified_tls_in_production(self):
++        with self.assertRaisesRegex(RouterConnectionError, "production"):
++            MikroTikClient(self.router, "username", "password", verify_tls=False)
++
++    @override_settings(MIKROTIK_ALLOWED_CIDRS=ALLOWED)
++    def test_no_sync_without_hotspot_server(self):
++        fake, posts = self.fake_api()
++
++        def no_hotspot(path, method="GET", payload=None):
++            if path == "ip/hotspot":
++                return []
++            return fake(path, method, payload)
++
++        self.client.force_login(self.owner)
++        with patch.object(MikroTikClient, "_request", side_effect=no_hotspot):
++            response = self.client.post(
++                reverse("networks:router_connect", args=[self.router.pk]),
++                {"username": "worldlink", "password": "secret", "verify_tls": "on", "action": "sync"},
++            )
++        self.assertContains(response, "No enabled MikroTik HotSpot server")
++        self.assertEqual(posts, [])
++        self.assertEqual(RouterVoucherSync.objects.count(), 0)
+diff --git a/networks/urls.py b/networks/urls.py
+index c5534aa..1897002 100644
+--- a/networks/urls.py
++++ b/networks/urls.py
+@@ -4,6 +4,7 @@ urlpatterns = [
+     path('routers/',views.router_list,name='routers'),
+     path('routers/new/',views.router_edit,name='router_new'),
+     path('routers/<int:pk>/edit/',views.router_edit,name='router_edit'),
++    path('routers/<int:pk>/connect/',views.router_connect,name='router_connect'),
+     path('routers/<int:pk>/delete/',views.router_delete,name='router_delete'),
+     path('locations/',views.location_list,name='locations'),
+     path('locations/new/',views.location_add,name='location_new'),
+diff --git a/networks/views.py b/networks/views.py
+index bda5b0a..82b8cf4 100644
+--- a/networks/views.py
++++ b/networks/views.py
+@@ -1,14 +1,22 @@
+ from django.contrib import messages
++from django.views.decorators.debug import sensitive_post_parameters
+ from django.shortcuts import get_object_or_404, redirect, render
+ from django.db.models.deletion import ProtectedError
++from django.db.models import Count
++from django.utils import timezone
++from django.views.decorators.cache import never_cache
+ from django.views.decorators.http import require_POST
+ from tenants.utils import require_tenant
+-from .models import Location, Router, WifiPlan
+-from .forms import LocationForm, RouterForm, WifiPlanForm
++from vouchers.models import Voucher
++from .models import Location, Router, RouterVoucherSync, WifiPlan
++from .forms import LocationForm, MikroTikLoginForm, RouterForm, WifiPlanForm
++from .mikrotik import MikroTikClient, RouterConnectionError
+ 
+ @require_tenant()
+ def router_list(request):
+-    routers = Router.objects.filter(company=request.active_company).select_related('location')
++    routers = Router.objects.filter(company=request.active_company).select_related('location').annotate(
++        synced_vouchers=Count('voucher_syncs')
++    )
+     return render(request, 'networks/routers.html', {'routers': routers, 'page_title': 'Routers'})
+ 
+ @require_tenant('OWNER','MANAGER','TECHNICIAN')
+@@ -18,11 +26,74 @@ def router_edit(request, pk=None):
+     if request.method == 'POST' and form.is_valid():
+         router = form.save(commit=False)
+         router.company = request.active_company
++        if router.location_id is None:
++            router.location, _ = Location.objects.get_or_create(
++                company=request.active_company, name='Main site',
++            )
+         router.save()
+-        messages.success(request, 'Router inventory saved. Live integration is not connected yet.')
++        messages.success(request, 'Router saved. Use Connect & sync to test a MikroTik gateway.')
+         return redirect('networks:routers')
+     return render(request,'networks/form.html',{'form':form,'page_title':'Edit router' if obj else 'Add router','form_type':'router'})
+ 
++
++@require_tenant('OWNER', 'MANAGER', 'TECHNICIAN')
++@never_cache
++@sensitive_post_parameters('password')
++def router_connect(request, pk):
++    router = get_object_or_404(Router, pk=pk, company=request.active_company)
++    if router.family != Router.Family.MIKROTIK:
++        messages.error(request, 'Live connection for this brand is not available. MikroTik RouterOS v7 is supported in this pilot.')
++        return redirect('networks:routers')
++    form = MikroTikLoginForm(request.POST or None)
++    info = None
++    sync_count = None
++    online_users = None
++    online_total = None
++    sold = Voucher.objects.filter(
++        company=request.active_company, status=Voucher.Status.SOLD, manual_sale__isnull=False
++    ).exclude(router_syncs__router=router).count()
++    if request.method == 'POST' and form.is_valid():
++        action = request.POST.get('action')
++        if action not in ('test', 'sync', 'online'):
++            form.add_error(None, 'Choose Test connection, View live users or Sync sold vouchers.')
++        else:
++            try:
++                api = MikroTikClient(
++                    router, form.cleaned_data['username'], form.cleaned_data['password'],
++                    verify_tls=form.cleaned_data['verify_tls'],
++                )
++                info = api.check_ready()
++                router.last_checked_at = timezone.now()
++                router.save(update_fields=['last_checked_at'])
++                if action == 'sync':
++                    sync_count = api.sync_sold_vouchers(router, request.user, max_count=10)
++                    sold = Voucher.objects.filter(
++                        company=request.active_company, status=Voucher.Status.SOLD, manual_sale__isnull=False
++                    ).exclude(router_syncs__router=router).count()
++                    messages.success(
++                        request,
++                        f'{sync_count} paid-manually sold vouchers confirmed on MikroTik. '
++                        'Only these router users may log in; no EvPay sandbox orders were activated.'
++                    )
++                elif action == 'online':
++                    online_users, online_total = api.active_users()
++                    messages.success(request, 'Read-only snapshot received directly from MikroTik HotSpot Active.')
++                else:
++                    messages.success(request, 'RouterOS HTTPS connection successful. No router settings were changed.')
++            except RouterConnectionError as exc:
++                messages.error(request, str(exc))
++    elif request.method == 'POST':
++        messages.error(request, 'Check the RouterOS username, password and certificate choice.')
++    response = render(request, 'networks/router_connect.html', {
++        'router': router, 'form': form, 'info': info, 'sync_count': sync_count,
++        'unsynced_sold': sold, 'synced_count': RouterVoucherSync.objects.filter(router=router).count(),
++        'online_users': online_users, 'online_total': online_total,
++        'page_title': 'Connect MikroTik',
++    })
++    response['Referrer-Policy'] = 'no-referrer'
++    response['Cache-Control'] = 'private, no-store'
++    return response
++
+ @require_tenant()
+ def location_list(request):
+     return render(request, 'networks/locations.html', {'locations':Location.objects.filter(company=request.active_company).order_by('name'),'page_title':'Locations'})
+diff --git a/static/css/app.css b/static/css/app.css
+index c35ffda..59bf42d 100644
+--- a/static/css/app.css
++++ b/static/css/app.css
+@@ -1001,3 +1001,19 @@ html[data-theme="dark"] {
+ .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+ @media(max-width:1100px){.wallet-columns{grid-template-columns:1fr}.wallet-review-row{grid-template-columns:1fr}.wallet-form-layout{grid-template-columns:minmax(0,1fr) minmax(190px,.5fr)}}
+ @media(max-width:760px){.wallet-hero{grid-template-columns:1fr;padding:23px 20px;gap:16px}.wallet-hero-side{border-left:0;border-top:1px solid rgba(255,255,255,.18);padding:16px 0 0}.wallet-stats{grid-template-columns:1fr}.wallet-metric{padding:14px 17px}.wallet-metric strong{font-size:19px}.wallet-form-layout{grid-template-columns:1fr}.wallet-info{padding:18px}.wallet-form-padding{padding:18px}.wallet-hero-amount{font-size:31px}.wallet-review-form{align-items:stretch}.wallet-review-form input{flex-basis:100%}}
++
++/* RouterOS v7 connection pilot — shared admin design and mobile sizes. */
++.router-connect-form{padding:18px 20px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 15px}
++.router-connect-form>.field{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:0;font-size:11px}
++.router-connect-form>.field label{font-weight:500;color:var(--ink-soft)}
++.router-connect-form>.field .input{width:100%;min-height:39px}
++.router-connect-form>.field:has(input[type="checkbox"]){grid-column:1/-1;flex-direction:row;align-items:center;flex-wrap:wrap}
++.router-connect-form>.field:has(input[type="checkbox"]) .field-hint{flex-basis:100%;margin-left:22px}
++.router-connect-form .form-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:9px;margin-top:3px}
++.router-steps{padding:1px 22px 16px 38px;margin:0}
++.router-steps li{padding:9px 0;color:var(--ink-soft);font-size:11px;line-height:1.65}
++.router-steps strong{color:var(--ink);font-weight:550}
++.router-notice{margin:0 18px 18px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);padding:13px 15px;font-size:10.5px;line-height:1.65;color:var(--ink-soft)}
++.router-notice strong{color:var(--ink)}
++.router-notice code{font-size:10px;overflow-wrap:anywhere}
++@media(max-width:650px){.router-connect-form{grid-template-columns:1fr;padding:14px}.router-connect-form .form-actions .button{flex:1;min-width:150px}.router-steps{padding:0 16px 12px 30px}}
+diff --git a/templates/base.html b/templates/base.html
+index 9d8832a..3f082f3 100644
+--- a/templates/base.html
++++ b/templates/base.html
+@@ -57,7 +57,7 @@
+           <div class="nav-panel"><div class="nav-panel-inner">
+             <a href="{% url 'hotspots:sessions' %}" title="{% t 'Connected users' %}" class="nav-link {% if request.resolver_match.namespace == 'hotspots' and request.resolver_match.url_name == 'sessions' or request.resolver_match.url_name == 'session_detail' %}active{% endif %}"><svg class="icon"><use href="#ico-user"></use></svg><span>{% t 'Connected users' %}</span></a>
+             <a href="{% url 'hotspots:customers' %}" title="{% t 'Wi-Fi customers' %}" class="nav-link {% if request.resolver_match.url_name == 'customers' or request.resolver_match.url_name == 'customer_detail' or request.resolver_match.url_name == 'customer_new' or request.resolver_match.url_name == 'customer_edit' %}active{% endif %}"><svg class="icon"><use href="#ico-user"></use></svg><span>{% t 'Wi-Fi customers' %}</span></a>
+-            <a href="{% url 'networks:routers' %}" title="{% t 'Routers' %}" class="nav-link {% if request.resolver_match.url_name == 'routers' or request.resolver_match.url_name == 'router_new' or request.resolver_match.url_name == 'router_edit' %}active{% endif %}"><svg class="icon"><use href="#ico-router"></use></svg><span>{% t 'Routers' %}</span></a>
++            <a href="{% url 'networks:routers' %}" title="{% t 'Routers' %}" class="nav-link {% if request.resolver_match.url_name == 'routers' or request.resolver_match.url_name == 'router_new' or request.resolver_match.url_name == 'router_edit' or request.resolver_match.url_name == 'router_connect' %}active{% endif %}"><svg class="icon"><use href="#ico-router"></use></svg><span>{% t 'Routers' %}</span></a>
+             <a href="{% url 'networks:locations' %}" title="{% t 'Locations' %}" class="nav-link {% if request.resolver_match.url_name == 'locations' or request.resolver_match.url_name == 'location_new' or request.resolver_match.url_name == 'location_edit' %}active{% endif %}"><svg class="icon"><use href="#ico-pin"></use></svg><span>{% t 'Locations' %}</span></a>
+             <a href="{% url 'networks:plans' %}" title="{% t 'Wi-Fi packages' %}" class="nav-link {% if request.resolver_match.url_name == 'plans' or request.resolver_match.url_name == 'plan_new' or request.resolver_match.url_name == 'plan_edit' %}active{% endif %}"><svg class="icon"><use href="#ico-box"></use></svg><span>{% t 'Wi-Fi packages' %}</span></a>
+           </div></div>
+diff --git a/templates/networks/router_connect.html b/templates/networks/router_connect.html
+new file mode 100644
+index 0000000..83e0534
+--- /dev/null
++++ b/templates/networks/router_connect.html
+@@ -0,0 +1,61 @@
++{% extends 'base.html' %}{% load translations %}
++{% block content %}
++<div class="page-heading">
++  <div><p class="eyebrow">NETWORK · MIKROTIK PILOT</p><h1>Connect {{ router.name }}</h1>
++    <p>Test RouterOS v7 safely, then activate vouchers already sold and confirmed by your business.</p></div>
++  <a class="button button-secondary" href="{% url 'networks:routers' %}">← Routers</a>
++</div>
++<div class="wallet-stats">
++  <div class="wallet-metric"><span>Management address</span><strong>{{ router.address|default:'Not set' }}:{{ router.management_port }}</strong><small>HTTPS over private LAN/VPN only</small></div>
++  <div class="wallet-metric"><span>Sold vouchers to sync</span><strong>{{ unsynced_sold }}</strong><small>Unpaid vouchers are never activated</small></div>
++  <div class="wallet-metric"><span>Already synced here</span><strong>{{ synced_count }}</strong><small>Previously confirmed on this router</small></div>
++</div>
++<div class="wallet-columns">
++  <section class="panel">
++    <div class="panel-heading"><div><h2>Router connection</h2><p>Your router password is used for this request only. WorldLink does not save it.</p></div></div>
++    {% if not router.address %}<div class="integration-notice notice-neutral">First edit this router and enter its LAN/VPN management IP address.</div>{% endif %}
++    <form class="router-connect-form" method="post" autocomplete="off">{% csrf_token %}
++      {% for field in form %}
++      <div class="field">
++        <label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
++        {% if field.help_text %}<small class="field-hint">{{ field.help_text }}</small>{% endif %}
++        {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
++      </div>
++      {% endfor %}
++      {% if form.non_field_errors %}<div class="field-error">{{ form.non_field_errors }}</div>{% endif %}
++      <div class="form-actions">
++        <button class="button button-secondary" name="action" value="test" type="submit">Test connection</button>
++        <button class="button button-secondary" name="action" value="online" type="submit">View live users</button>
++        <button class="button button-primary" name="action" value="sync" type="submit">Sync up to 10 sold vouchers</button>
++      </div>
++    </form>
++    {% if info %}<div class="router-notice">
++      <strong>Router recognized:</strong> {{ info.model }} · RouterOS {{ info.version }}
++      {% if sync_count != None %}<p>{{ sync_count }} voucher(s) confirmed on the router.</p>{% endif %}
++    </div>{% endif %}
++    {% if online_users != None %}
++    <div class="router-notice"><strong>Live router snapshot: {{ online_total }} active sessions</strong>
++      <p>Read directly from MikroTik at the time you clicked. This is not continuous monitoring.</p></div>
++    <div class="table-wrap"><table class="data-table"><thead><tr><th>HotSpot login</th><th>IP</th><th>Online for</th></tr></thead><tbody>
++      {% for item in online_users %}<tr><td class="mono">{{ item.username }}</td><td class="mono">{{ item.address }}</td><td>{{ item.uptime }}</td></tr>
++      {% empty %}<tr><td colspan="3" class="empty-cell">No active customers reported by this router.</td></tr>{% endfor %}
++    </tbody></table></div>
++    {% endif %}
++  </section>
++  <section class="panel">
++    <div class="panel-heading"><div><h2>Before your first test</h2><p>A short checklist for the technician</p></div></div>
++    <ol class="router-steps">
++      <li>RouterOS <strong>v7</strong> and its <strong>HotSpot server</strong> must already be enabled on the guest bridge.</li>
++      <li>Enable <strong>www-ssl</strong> for RouterOS REST. Keep it restricted to the management LAN or VPN—never the public internet.</li>
++      <li>Use a dedicated RouterOS login for WorldLink. Configure a trusted HTTPS certificate where possible.</li>
++      <li>WorldLink's server must be able to reach the router's IP. An administrator must allow-list it using <code>MIKROTIK_ALLOWED_CIDRS</code>.</li>
++      <li>Test connection, then sync <strong>SOLD</strong> vouchers. Customers enter the printed code as both username and password on the MikroTik HotSpot login page.</li>
++    </ol>
++    <div class="router-notice">
++      <strong>Pilot limitations:</strong> Live EvPay auto-activation, Omada/Cudy provisioning,
++      remote connectivity through mobile CGNAT, and live online-user polling are not implemented yet.
++      RouterOS <em>limit-uptime</em> measures total connected usage, not calendar time from first login.
++    </div>
++  </section>
++</div>
++{% endblock %}
+diff --git a/templates/networks/routers.html b/templates/networks/routers.html
+index 9f6f3f9..2f2f259 100644
+--- a/templates/networks/routers.html
++++ b/templates/networks/routers.html
+@@ -1,8 +1,8 @@
+ {% extends 'base.html' %}{% load translations %}{% block content %}
+-<div class="page-heading"><div><p class="eyebrow">{% t 'Network management' %}</p><h1>{% t 'Router inventory' %}</h1><p>{% t 'System integration pending' %}</p></div>
++<div class="page-heading"><div><p class="eyebrow">{% t 'Network management' %}</p><h1>{% t 'Routers' %}</h1><p>MikroTik v7 pilot · securely connect and provision sold Wi-Fi vouchers</p></div>
+ {% if active_membership.role == 'OWNER' or active_membership.role == 'MANAGER' or active_membership.role == 'TECHNICIAN' %}<a href="{% url 'networks:router_new' %}" class="button button-primary">＋ {% t 'Add router' %}</a>{% endif %}</div>
+ <section class="panel"><div class="table-wrap"><table class="data-table"><thead><tr><th>{% t 'Name' %}</th><th>{% t 'Model' %}</th><th>{% t 'Location' %}</th><th>{% t 'IP address' %}</th><th>{% t 'Connection' %}</th><th>{% t 'Actions' %}</th></tr></thead><tbody>
+-{% for item in routers %}<tr><td class="bold">{{ item.name }}</td><td>{{ item.get_family_display }} <small class="cell-sub">{{ item.model_name }}</small></td><td>{{ item.location.name }}</td><td class="mono">{{ item.address|default:'—' }}</td><td><span class="pill pending">{% t 'Not connected' %}</span></td><td>
+-{% if active_membership.role == 'OWNER' or active_membership.role == 'MANAGER' or active_membership.role == 'TECHNICIAN' %}<div class="row-actions"><a class="action-button" href="{% url 'networks:router_edit' item.pk %}"><svg class="icon"><use href="#ico-pencil"></use></svg>{% t 'Edit' %}</a>
++{% for item in routers %}<tr><td class="bold">{{ item.name }}</td><td>{{ item.get_family_display }} <small class="cell-sub">{{ item.model_name }}</small></td><td>{{ item.location.name }}</td><td class="mono">{{ item.address|default:'—' }}</td><td>{% if item.last_checked_at %}<span class="pill ready">Tested {{ item.last_checked_at|date:'d M H:i' }}</span><small class="cell-sub">{{ item.synced_vouchers }} sold codes synced · not a live status check</small>{% else %}<span class="pill pending">{% t 'Not tested' %}</span>{% endif %}</td><td>
++{% if active_membership.role == 'OWNER' or active_membership.role == 'MANAGER' or active_membership.role == 'TECHNICIAN' %}<div class="row-actions">{% if item.family == 'MIKROTIK' %}<a class="action-button" href="{% url 'networks:router_connect' item.pk %}">Connect &amp; sync</a>{% endif %}<a class="action-button" href="{% url 'networks:router_edit' item.pk %}"><svg class="icon"><use href="#ico-pencil"></use></svg>{% t 'Edit' %}</a>
+ <form method="post" action="{% url 'networks:router_delete' item.pk %}">{% csrf_token %}<button type="submit" class="action-button action-delete" data-confirm="Delete this router from inventory?">{% t 'Delete' %}</button></form></div>{% else %}—{% endif %}</td></tr>
+-{% empty %}<tr><td colspan="6" class="empty-cell">{% t 'No records yet.' %} <a class="text-link" href="{% url 'networks:location_new' %}">{% t 'Add location' %}</a></td></tr>{% endfor %}</tbody></table></div></section>{% endblock %}
+\ No newline at end of file
++{% empty %}<tr><td colspan="6" class="empty-cell">{% t 'No records yet.' %} <a class="text-link" href="{% url 'networks:location_new' %}">{% t 'Add location' %}</a></td></tr>{% endfor %}</tbody></table></div></section>{% endblock %}

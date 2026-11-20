@@ -1,4 +1,5 @@
 import os
+import ipaddress
 from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 from .env import load_environment
@@ -22,7 +23,7 @@ ALLOW_PUBLIC_SIGNUP = flag('ALLOW_PUBLIC_SIGNUP', DEBUG)
 INSTALLED_APPS = [
     'django.contrib.admin', 'django.contrib.auth', 'django.contrib.contenttypes',
     'django.contrib.sessions', 'django.contrib.messages', 'django.contrib.staticfiles',
-    'cloud', 'tenants', 'networks', 'vouchers', 'hotspots', 'controlcenter', 'portal', 'payments',
+    'cloud', 'tenants', 'networks', 'vouchers', 'hotspots', 'controlcenter', 'portal', 'payments', 'wallets',
 ]
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -91,6 +92,14 @@ SECURE_HSTS_PRELOAD = False
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https') if flag('TRUST_PROXY_SSL_HEADER', False) else None
 X_FRAME_OPTIONS = 'DENY'
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend'
+
+# Opt-in router management only across explicitly authorized private LAN/VPN ranges.
+# Example: MIKROTIK_ALLOWED_CIDRS=192.168.88.1/32,10.8.0.0/24
+MIKROTIK_ALLOWED_CIDRS = tuple(
+    ipaddress.ip_network(item.strip(), strict=False)
+    for item in os.environ.get('MIKROTIK_ALLOWED_CIDRS', '').split(',') if item.strip()
+)
+MIKROTIK_CA_FILE = os.environ.get('MIKROTIK_CA_FILE', '').strip()
 
 # EvPay pilot (default: OFF). Use one approved merchant for ONE pilot company only.
 # Do not enable live collections until you have verified sandbox callbacks.

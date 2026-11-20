@@ -81,6 +81,16 @@ def build_breadcrumbs(request):
         else:
             trail.append(('Payment requests','payments:orders' if name != 'orders' else None))
             if name in ('order_detail','verify','cancel'): trail.append(('Request details',None))
+    elif namespace == 'wallets':
+        if name in ('dashboard', 'destination_add', 'withdrawal_new', 'withdrawal_cancel'):
+            trail.append(('Money & withdrawals', 'wallets:dashboard' if name != 'dashboard' else None))
+            if name == 'destination_add': trail.append(('Add receiving number',None))
+            if name == 'withdrawal_new': trail.append(('Request withdrawal',None))
+        else:
+            trail = [('WorldLink Control Center','controlcenter:overview'),
+                     ('Withdrawals & collections', 'wallets:queue' if name != 'queue' else None)]
+            if name == 'withdrawal_detail': trail.append(('Withdrawal review',None))
+            if name == 'collection_new': trail.append(('Record cleared payment',None))
     elif namespace == 'portal':
         trail.append(('Administration',None))
         trail.append(('Captive portal',None))
@@ -90,6 +100,16 @@ def build_breadcrumbs(request):
         if name == 'create': trail.append(('Generate vouchers',None))
         elif name == 'batch_detail': trail.append(('View batch',None))
         elif name == 'batch_edit': trail.extend([('View batch',reverse('vouchers:batch_detail',kwargs={'pk':resolver.kwargs['pk']})),('Edit batch',None)])
+    elif namespace == 'networks':
+        trail.append(('Network', None))
+        if name.startswith('router'):
+            trail.append(('Routers', 'networks:routers' if name != 'routers' else None))
+            if name == 'router_connect': trail.append(('Connect MikroTik', None))
+            elif name in ('router_new', 'router_edit'): trail.append(('Router details', None))
+        elif name.startswith('plan'):
+            trail.append(('Wi-Fi packages', 'networks:plans' if name != 'plans' else None))
+        elif name.startswith('location'):
+            trail.append(('Locations', 'networks:locations' if name != 'locations' else None))
     elif name in ('reports','expenses','expense_new','expense_edit'):
         trail.append(('Sales',None))
         if name == 'reports': trail.append(('Sales reports',None))
@@ -108,7 +128,13 @@ def build_breadcrumbs(request):
 
 def shell_context(request):
     membership=active_membership(request)
+    resolver=getattr(request,'resolver_match',None)
+    platform_area=bool(resolver and (resolver.namespace == 'controlcenter' or (
+        resolver.namespace == 'wallets' and resolver.url_name in
+        ('queue','destination_review','withdrawal_detail','withdrawal_review','collection_new')
+    )))
     return {
+        'platform_area':platform_area,
         'active_membership':membership,
         'breadcrumbs':build_breadcrumbs(request) if request.user.is_authenticated else [],
         'active_company':membership.company if membership else None,

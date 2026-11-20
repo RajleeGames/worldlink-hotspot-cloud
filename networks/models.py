@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.core.validators import MinValueValidator
 from tenants.models import Company
 
@@ -22,7 +23,15 @@ class Router(models.Model):
     name = models.CharField(max_length=120)
     family = models.CharField(max_length=12, choices=Family.choices, default=Family.MIKROTIK)
     model_name = models.CharField(max_length=100, blank=True)
-    address = models.GenericIPAddressField(null=True, blank=True, help_text='Inventory only; no connection yet')
+    address = models.GenericIPAddressField(
+        null=True, blank=True,
+        help_text='Router management IP reachable from this server over your private LAN/VPN.',
+    )
+    management_port = models.PositiveIntegerField(
+        default=443, validators=[MinValueValidator(1)],
+        help_text='RouterOS HTTPS REST port (normally 443). Never expose it publicly.',
+    )
+    last_checked_at = models.DateTimeField(null=True, blank=True)
     serial = models.CharField(max_length=120, blank=True)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -46,3 +55,16 @@ class WifiPlan(models.Model):
         ordering = ['-created_at']
     def __str__(self):
         return self.name
+
+
+class RouterVoucherSync(models.Model):
+    """Proven RouterOS provisioning for a previously sold, paid-manually voucher."""
+    router = models.ForeignKey(Router, on_delete=models.PROTECT, related_name='voucher_syncs')
+    voucher = models.ForeignKey('vouchers.Voucher', on_delete=models.PROTECT, related_name='router_syncs')
+    synced_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    synced_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['router', 'voucher'], name='whc_one_voucher_per_router')
+        ]

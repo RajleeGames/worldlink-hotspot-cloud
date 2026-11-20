@@ -25,6 +25,7 @@ urlpatterns = [
     path('console/', include(('controlcenter.urls', 'controlcenter'), namespace='controlcenter')),
     path('', include(('portal.urls', 'portal'), namespace='portal')),
     path('payments/', include(('payments.urls', 'payments'), namespace='payments')),
+    path('wallet/', include(('wallets.urls', 'wallets'), namespace='wallets')),
 ]
 
 if settings.DEBUG:

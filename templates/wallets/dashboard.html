@@ -1,0 +1,26 @@
+{% extends 'base.html' %}{% load translations %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">WORLDLINK · {% t 'Business money' %}</p><h1>{% t 'Money & withdrawals' %}</h1><p>{% t 'Your cleared WorldLink collections and manual withdrawal requests' %}</p></div><div class="head-actions"><a href="{% url 'wallets:destination_add' %}" class="button button-secondary">＋ {% t 'Add receiving number' %}</a><a href="{% url 'wallets:withdrawal_new' %}" class="button button-primary">{% t 'Request withdrawal' %}</a></div></div>
+<div class="wallet-hero">
+  <div><div class="wallet-hero-kicker"><span class="wallet-pulse"></span>{% t 'Available to withdraw' %}</div><div class="wallet-hero-amount"><small>TZS</small> {{ wallet.available|default:0|floatformat:0 }}</div><p>{% t 'Cleared funds held for your business by WorldLink. Test payments and offline voucher sales are excluded.' %}</p></div>
+  <div class="wallet-hero-side"><span>{% t 'How withdrawal works' %}</span><strong>{% t 'Request → WorldLink reviews → manual payment' %}</strong><small>{% t 'Your registered number must be independently verified first.' %}</small></div>
+</div>
+<div class="wallet-stats">
+  <div class="wallet-metric"><span>{% t 'Total collected' %}</span><strong>TZS {{ wallet.collected|default:0|floatformat:0 }}</strong><small>{% t 'Confirmed cleared collections' %}</small></div>
+  <div class="wallet-metric"><span>{% t 'Pending withdrawals' %}</span><strong>TZS {{ wallet.reserved|default:0|floatformat:0 }}</strong><small>{% t 'Reserved, not yet paid' %}</small></div>
+  <div class="wallet-metric"><span>{% t 'Total paid out' %}</span><strong>TZS {{ wallet.paid_out|default:0|floatformat:0 }}</strong><small>{% t 'WorldLink-confirmed manual transfers' %}</small></div>
+</div>
+<div class="wallet-columns">
+  <section class="panel"><div class="panel-heading"><div><h2>{% t 'Withdrawal requests' %}</h2><p>{% t 'Follow each request until WorldLink confirms payment' %}</p></div><a href="{% url 'wallets:withdrawal_new' %}" class="text-link">＋ {% t 'New request' %}</a></div>
+    <div class="table-wrap"><table class="data-table wallet-table"><thead><tr><th>{% t 'Date' %}</th><th>{% t 'Receiving number' %}</th><th>{% t 'Amount' %}</th><th>{% t 'Status' %}</th><th></th></tr></thead><tbody>
+    {% for item in withdrawals %}<tr><td>{{ item.created_at|date:'d M Y' }}</td><td><strong>{{ item.recipient_name }}</strong><span class="wallet-subline">{{ item.masked_phone }}</span></td><td>TZS {{ item.amount|floatformat:0 }}</td><td><span class="pill {% if item.status == 'PAID' %}ready{% elif item.status == 'REQUESTED' or item.status == 'PROCESSING' %}pending{% endif %}">{% t item.get_status_display %}</span></td><td>{% if item.status == 'REQUESTED' and item.requested_by_id == user.pk %}<form method="post" action="{% url 'wallets:withdrawal_cancel' item.pk %}" onsubmit="return confirm('Cancel this unpaid request?')">{% csrf_token %}<button class="wallet-text-button" type="submit">{% t 'Cancel' %}</button></form>{% else %}<span class="wallet-muted">—</span>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="5" class="empty-cell">{% t 'No withdrawals yet.' %}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+  <section class="panel"><div class="panel-heading"><div><h2>{% t 'Receiving numbers' %}</h2><p>{% t 'Only independently verified numbers can receive money' %}</p></div><a href="{% url 'wallets:destination_add' %}" class="text-link">＋ {% t 'Add' %}</a></div>
+    <div class="wallet-number-list">{% for dest in destinations %}<div class="wallet-number"><span class="wallet-number-icon"><svg class="icon"><use href="#ico-wallet"></use></svg></span><div><strong>{{ dest.account_name }}</strong><small>{{ dest.get_provider_display }} · {{ dest.masked_phone }}</small></div><span class="pill {% if dest.status == 'VERIFIED' %}ready{% elif dest.status == 'PENDING' %}pending{% endif %}">{% t dest.get_status_display %}</span></div>{% empty %}<div class="empty-small">{% t 'No receiving numbers yet. Add yours to start verification.' %}</div>{% endfor %}</div>
+    <div class="wallet-hint"><svg class="icon"><use href="#ico-shield"></use></svg><span>{% t 'WorldLink verifies the number and account name independently. Submitting a phone number alone is not verification.' %}</span></div>
+  </section>
+</div>
+<section class="panel"><div class="panel-heading"><div><h2>{% t 'Confirmed collections' %}</h2><p>{% t 'Production payments verified as cleared to WorldLink' %}</p></div></div><div class="table-wrap"><table class="data-table wallet-table"><thead><tr><th>{% t 'Date' %}</th><th>{% t 'Payment reference' %}</th><th class="num">{% t 'Amount' %} (TZS)</th></tr></thead><tbody>{% for item in collections %}<tr><td>{{ item.created_at|date:'d M Y H:i' }}</td><td class="mono">{{ item.source_reference }}</td><td class="num">{{ item.amount|floatformat:0 }}</td></tr>{% empty %}<tr><td colspan="3" class="empty-cell">{% t 'No cleared collections recorded yet.' %}</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

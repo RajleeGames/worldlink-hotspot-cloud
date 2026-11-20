@@ -22,6 +22,7 @@ User=get_user_model()
 
 @platform_required()
 def overview(request):
+    from wallets.models import WithdrawalRequest, WithdrawalDestination
     recent_businesses=Company.objects.order_by('-created_at')[:7]
     latest_audits=PlatformAudit.objects.select_related('actor','company')[:8]
     online=HotspotSession.objects.filter(HotspotSession.online_filter())
@@ -36,6 +37,8 @@ def overview(request):
         'online_count':online.count(), 'session_count':HotspotSession.objects.count(),
         'demo_sessions':HotspotSession.objects.filter(source='DEMO').count(),
         'sales_sum':ManualSale.objects.aggregate(total=Sum('amount'))['total'] or 0,
+        'pending_withdrawals':WithdrawalRequest.objects.filter(status__in=['REQUESTED','PROCESSING']).count(),
+        'pending_receiving_numbers':WithdrawalDestination.objects.filter(status='PENDING').count(),
         'recent_businesses':recent_businesses,'latest_audits':latest_audits,
         'can_manage_platform':platform_can_manage(request.user)})
 

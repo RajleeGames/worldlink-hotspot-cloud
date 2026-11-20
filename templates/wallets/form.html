@@ -1,0 +1,11 @@
+{% extends 'base.html' %}{% load translations %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">WORLDLINK · {% t 'Business money' %}</p><h1>{% t form_title %}</h1><p>{% t explanation %}</p></div><a class="button button-secondary" href="{% url 'wallets:dashboard' %}">{% t 'Back' %}</a></div>
+<div class="wallet-form-layout"><section class="panel"><div class="wallet-form-padding">
+  <form method="post" class="wallet-form" autocomplete="off">{% csrf_token %}{% if request_key %}<input type="hidden" name="request_key" value="{{ request_key }}">{% endif %}
+    {% if form.non_field_errors %}<div class="flash error">{{ form.non_field_errors }}</div>{% endif %}
+    {% for field in form %}<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% if field.errors %}<small class="field-errors">{{ field.errors|striptags }}</small>{% endif %}</div>{% endfor %}
+    <button class="button button-primary" type="submit">{% t submit_label %}</button>
+  </form>
+</div></section><aside class="wallet-info"><svg class="icon"><use href="#ico-shield"></use></svg><h3>{% t 'Your money is protected' %}</h3><p>{% t 'A receiving number cannot be used until WorldLink checks the number and registered account name. Withdrawal requests never send money automatically.' %}</p></aside></div>
+{% endblock %}

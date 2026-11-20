@@ -927,3 +927,93 @@ html[data-theme="dark"] {
 @media(max-width:840px){.evpay-grid{grid-template-columns:1fr}.evpay-panel-body{padding:14px}.evpay-table{min-width:710px}.evpay-state-divider{display:none}}
 
 .evpay-form .evpay-consent{display:flex;align-items:flex-start;gap:8px;font-size:10.5px;line-height:1.55}.evpay-consent input{accent-color:var(--accent);margin-top:2px;flex:none}.evpay-consent span{flex:1}
+
+/* WorldLink money & withdrawals — same shared theme, separate audited ledger. */
+.wallet-hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(225px,.48fr);gap:28px;align-items:center;background:linear-gradient(130deg,#153f48 0%,#0d353c 58%,#136459 100%);border:1px solid rgba(255,255,255,.08);border-radius:13px;color:#f3fffb;padding:28px 30px;margin-bottom:14px;box-shadow:0 12px 35px rgba(9,48,51,.1)}
+.wallet-hero-kicker{font-size:11px;letter-spacing:.012em;color:#bfdbd8;display:flex;align-items:center;gap:8px}
+.wallet-pulse{width:7px;height:7px;border-radius:50%;background:#6ce4b9;box-shadow:0 0 0 4px rgba(108,228,185,.12)}
+.wallet-hero-amount{font-size:clamp(29px,3.2vw,43px);font-weight:550;letter-spacing:-.04em;line-height:1.2;margin:13px 0}
+.wallet-hero-amount small{font-size:12px;font-weight:450;color:#9ccdc7;letter-spacing:.04em;vertical-align:middle;margin-right:5px}
+.wallet-hero p{color:#a8ceca;font-size:10.5px;margin:0;max-width:490px;line-height:1.65}
+.wallet-hero-side{border-left:1px solid rgba(255,255,255,.22);padding:7px 0 7px 24px;display:flex;flex-direction:column;gap:7px}
+.wallet-hero-side span{font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:#89bbb5}
+.wallet-hero-side strong{font-weight:500;font-size:12px;line-height:1.65}
+.wallet-hero-side small{font-size:10px;color:#b4d6d1;line-height:1.5}
+.wallet-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin-bottom:17px}
+.wallet-metric{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:17px 19px;display:flex;flex-direction:column;gap:7px}
+.wallet-metric span{font-size:10px;color:var(--muted)}
+.wallet-metric strong{font-size:21px;font-weight:550;letter-spacing:-.035em;line-height:1.3;overflow-wrap:anywhere}
+.wallet-metric small{font-size:9.5px;color:var(--muted)}
+.wallet-columns{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:15px;align-items:start}
+.wallet-number-list{padding:4px 18px 13px}
+.wallet-number{display:flex;align-items:center;gap:11px;border-bottom:1px solid var(--border);padding:14px 0}
+.wallet-number:last-child{border-bottom:0}
+.wallet-number-icon,.wallet-dashboard-link-icon{width:35px;height:35px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;border-radius:9px;flex:none}
+.wallet-number>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.wallet-number strong{font-weight:500;font-size:10.5px;overflow-wrap:anywhere}
+.wallet-number small,.wallet-subline{font-size:9.5px;color:var(--muted);display:block;white-space:normal}
+.wallet-hint{display:flex;align-items:flex-start;gap:9px;background:var(--surface-2);padding:13px 16px;margin:0 17px 17px;border-radius:8px;color:var(--ink-soft);font-size:10px;line-height:1.6}
+.wallet-hint svg{height:16px;width:16px;color:var(--accent)}
+.wallet-table{min-width:550px}.wallet-table th{font-size:9px}.wallet-table td{font-size:10.5px;white-space:normal}
+.wallet-table td strong{font-weight:500}
+.wallet-table td .wallet-subline{margin-top:3px}
+.wallet-text-button{color:var(--red);background:transparent;border:0;font-size:10px;padding:4px}
+.wallet-text-button:hover{text-decoration:underline}
+.wallet-muted{color:var(--muted);font-size:10.5px;line-height:1.6}
+.wallet-form-layout{display:grid;grid-template-columns:minmax(0,640px) minmax(210px,320px);gap:15px;align-items:start}
+.wallet-form-padding{padding:23px}
+.wallet-form-padding h2{font-size:14px;margin:0 0 9px;font-weight:550}
+.wallet-form{display:flex;flex-direction:column;gap:17px}
+.wallet-form .field{gap:7px}
+.wallet-form .field label{font-weight:500;font-size:11px}
+.wallet-form .field :is(input,select,textarea),.wallet-review-form input{width:100%;min-height:42px;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);border-radius:8px;padding:9px 11px;font-size:12px;outline:0}
+.wallet-form .field :is(input,select,textarea):focus,.wallet-review-form input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.wallet-form .field textarea{min-height:80px}
+.wallet-form .field small{font-size:9px;color:var(--muted)}
+.wallet-form .field .field-errors{color:var(--red)}
+.wallet-form>.button{align-self:flex-start}
+.wallet-info{background:var(--accent-soft);border:1px solid var(--border);border-radius:10px;padding:24px}
+.wallet-info>.icon{width:22px;height:22px;color:var(--accent);margin-bottom:15px}
+.wallet-info h3{font-size:13px;font-weight:550;margin:0 0 9px}
+.wallet-info p{font-size:11px;line-height:1.75;color:var(--ink-soft);margin:0}
+.wallet-review-list{padding:0 19px}
+.wallet-review-row{display:grid;grid-template-columns:minmax(230px,.75fr) minmax(330px,1fr);gap:15px;align-items:center;padding:16px 0;border-bottom:1px solid var(--border)}
+.wallet-review-row:last-child{border-bottom:0}
+.wallet-review-row>div{display:flex;flex-direction:column;gap:4px}
+.wallet-review-row strong{font-size:11px;font-weight:550}
+.wallet-review-row span{font-size:10.5px;color:var(--ink-soft)}
+.wallet-review-row small{font-size:9.5px;color:var(--muted)}
+.wallet-review-form{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.wallet-review-form input{min-width:170px;flex:1;font-size:10.5px;min-height:32px}
+.wallet-review-form .button{white-space:nowrap}
+.wallet-detail-line{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;border-bottom:1px solid var(--border);padding:13px 0;font-size:11px}
+.wallet-detail-line:first-child{padding-top:0}
+.wallet-detail-line:last-child{border-bottom:0}
+.wallet-detail-line span{color:var(--muted)}
+.wallet-detail-line strong{text-align:right;font-size:12px;font-weight:550;overflow-wrap:anywhere}
+.wallet-actions{display:flex;gap:9px;flex-wrap:wrap}
+.wallet-dashboard-link{display:flex;align-items:center;gap:13px;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:15px 17px;margin-bottom:15px;transition:border-color .15s,background .15s}
+.wallet-dashboard-link:hover{border-color:var(--accent);background:var(--accent-soft)}
+.wallet-dashboard-link>span:nth-child(2){flex:1;display:flex;flex-direction:column;gap:3px}
+.wallet-dashboard-link strong{font-size:11.5px;font-weight:550}
+.wallet-dashboard-link small{font-size:10px;color:var(--muted)}
+.wallet-dashboard-arrow{font-size:19px;color:var(--accent)}
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+@media(max-width:1100px){.wallet-columns{grid-template-columns:1fr}.wallet-review-row{grid-template-columns:1fr}.wallet-form-layout{grid-template-columns:minmax(0,1fr) minmax(190px,.5fr)}}
+@media(max-width:760px){.wallet-hero{grid-template-columns:1fr;padding:23px 20px;gap:16px}.wallet-hero-side{border-left:0;border-top:1px solid rgba(255,255,255,.18);padding:16px 0 0}.wallet-stats{grid-template-columns:1fr}.wallet-metric{padding:14px 17px}.wallet-metric strong{font-size:19px}.wallet-form-layout{grid-template-columns:1fr}.wallet-info{padding:18px}.wallet-form-padding{padding:18px}.wallet-hero-amount{font-size:31px}.wallet-review-form{align-items:stretch}.wallet-review-form input{flex-basis:100%}}
+
+/* RouterOS v7 connection pilot — shared admin design and mobile sizes. */
+.router-connect-form{padding:18px 20px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 15px}
+.router-connect-form>.field{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:0;font-size:11px}
+.router-connect-form>.field label{font-weight:500;color:var(--ink-soft)}
+.router-connect-form>.field .input{width:100%;min-height:39px}
+.router-connect-form>.field:has(input[type="checkbox"]){grid-column:1/-1;flex-direction:row;align-items:center;flex-wrap:wrap}
+.router-connect-form>.field:has(input[type="checkbox"]) .field-hint{flex-basis:100%;margin-left:22px}
+.router-connect-form .form-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:9px;margin-top:3px}
+.router-steps{padding:1px 22px 16px 38px;margin:0}
+.router-steps li{padding:9px 0;color:var(--ink-soft);font-size:11px;line-height:1.65}
+.router-steps strong{color:var(--ink);font-weight:550}
+.router-notice{margin:0 18px 18px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);padding:13px 15px;font-size:10.5px;line-height:1.65;color:var(--ink-soft)}
+.router-notice strong{color:var(--ink)}
+.router-notice code{font-size:10px;overflow-wrap:anywhere}
+@media(max-width:650px){.router-connect-form{grid-template-columns:1fr;padding:14px}.router-connect-form .form-actions .button{flex:1;min-width:150px}.router-steps{padding:0 16px 12px 30px}}
