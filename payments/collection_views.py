@@ -1,8 +1,10 @@
 """Authenticated EvPay customer callbacks and tenant-scoped review views."""
+import hmac
 import json
 import logging
 import re
 import secrets
+import time
 
 from django.conf import settings
 from django.contrib import messages
@@ -16,11 +18,29 @@ from django.views.decorators.http import require_POST
 
 from tenants.utils import require_tenant
 from .collections import apply_collection_status, EARNING_STATUSES
-from .evpay import EvPayError, retrieve_ussd, verify_webhook
+from .evpay import EvPayError, retrieve_ussd, sign_payload, verify_webhook
 from .evpay_lab import EVENT_STATUSES
 from .models import EvPayCollection
 
 logger = logging.getLogger(__name__)
+
+
+def _signature_failure_reason(raw, header):
+    """Describe a failed signature safely: never log raw data, HMACs or keys."""
+    if not header:
+        return 'signature header missing'
+    pieces = dict(part.strip().split('=', 1) for part in header.split(',') if '=' in part)
+    timestamp, digest = pieces.get('t', ''), pieces.get('v1', '')
+    if not re.fullmatch(r'\d{10,11}', timestamp):
+        return 'invalid signature timestamp format'
+    if not re.fullmatch(r'[a-fA-F0-9]{64}', digest):
+        return 'invalid signature HMAC format'
+    if abs(int(time.time()) - int(timestamp)) > 300:
+        return 'signature timestamp outside five-minute window'
+    key = settings.EVPAY_SIG_KEY
+    if key and hmac.compare_digest(sign_payload(key, timestamp, raw), digest.lower()):
+        return 'HMAC matches API request-signing key, not webhook secret'
+    return 'HMAC mismatch; confirm merchant webhook signing secret with EvPay'
 
 
 @csrf_exempt
@@ -34,11 +54,11 @@ def webhook(request, token):
         logger.warning('EvPay collection webhook rejected: route token or configuration mismatch.')
         return JsonResponse({'error': 'Forbidden'}, status=401)
     raw = request.body
-    if len(raw) > 200000 or not verify_webhook(raw,
-            request.headers.get('X-EvPay-Signature', ''), secret):
+    signature = request.headers.get('X-EvPay-Signature', '')
+    if len(raw) > 200000 or not verify_webhook(raw, signature, secret):
         logger.warning('EvPay collection webhook rejected: %s.',
-            'missing signature header' if not request.headers.get('X-EvPay-Signature')
-            else 'invalid signature or timestamp')
+            'oversized callback body' if len(raw) > 200000
+            else _signature_failure_reason(raw, signature))
         return JsonResponse({'error': 'Invalid signature'}, status=401)
     delivery_id = request.headers.get('X-EvPay-Delivery', '')
     event_header = request.headers.get('X-EvPay-Event', '')

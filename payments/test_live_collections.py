@@ -116,6 +116,39 @@ class CollectionSafetyTests(TestCase):
         self.assertEqual(obj.status, 'CREATED')
         self.assertIsNone(obj.confirmed_at)
 
+    def test_webhook_diagnostics_distinguish_wrong_key_without_accepting_it(self):
+        obj = self._collection()
+        timestamp = int(time.time())
+        body = json.dumps({'event': 'payment.succeeded', 'timestamp': timestamp, 'data': {
+            'orderReference': obj.reference, 'status': 'SUCCESS', 'amount': 500,
+            'currency': 'TZS'}}, separators=(',', ':')).encode()
+        # The API request signing key is NOT automatically trusted for callbacks.
+        signature = sign_payload(PILOT['EVPAY_SIG_KEY'], timestamp, body)
+        url = reverse('payments:collection_webhook',
+                      kwargs={'token': PILOT['EVPAY_COLLECTION_WEBHOOK_TOKEN']})
+        with self.assertLogs('payments.collection_views', level='WARNING') as caught:
+            res = self.client.post(url, data=body, content_type='application/json',
+                HTTP_X_EVPAY_SIGNATURE=f't={timestamp},v1={signature}')
+        self.assertEqual(res.status_code, 401)
+        self.assertIn('matches API request-signing key', caught.output[0])
+        obj.refresh_from_db()
+        self.assertEqual(obj.status, 'CREATED')
+
+    def test_webhook_diagnostics_identify_expired_signature_without_accepting_it(self):
+        obj = self._collection()
+        timestamp = int(time.time()) - 600
+        body = b'{}'
+        signature = sign_payload(PILOT['EVPAY_WEBHOOK_SECRET'], timestamp, body)
+        url = reverse('payments:collection_webhook',
+                      kwargs={'token': PILOT['EVPAY_COLLECTION_WEBHOOK_TOKEN']})
+        with self.assertLogs('payments.collection_views', level='WARNING') as caught:
+            res = self.client.post(url, data=body, content_type='application/json',
+                HTTP_X_EVPAY_SIGNATURE=f't={timestamp},v1={signature}')
+        self.assertEqual(res.status_code, 401)
+        self.assertIn('outside five-minute window', caught.output[0])
+        obj.refresh_from_db()
+        self.assertEqual(obj.status, 'CREATED')
+
     def test_failed_reversed_payments_cannot_authorize(self):
         obj = self._collection()
         apply_collection_status(reference=obj.reference, status='FAILED', amount=500, currency='TZS')
