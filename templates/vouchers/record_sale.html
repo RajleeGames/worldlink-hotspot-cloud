@@ -1,0 +1,23 @@
+{% extends 'base.html' %}{% load translations %}
+{% block content %}
+<div class="page-heading">
+  <div><p class="eyebrow">{% t 'Voucher batches' %} / #{{ voucher.batch_id }}</p><h1>{% t 'Record voucher sale' %}</h1><p>{% t 'Confirm the payment received by your business.' %}</p></div>
+  <a href="{% url 'vouchers:batch_detail' voucher.batch_id %}" class="button button-secondary">← {% t 'Back' %}</a>
+</div>
+<div class="sale-page-layout">
+  <section class="panel sale-panel">
+    <div class="sale-summary">
+      <span class="stat-label">{% t 'Voucher code' %}</span>
+      <strong class="sale-code mono">{{ voucher.code }}</strong>
+      <span class="stat-label">{{ voucher.batch.plan.name }} · {{ voucher.batch.plan.duration_minutes }} {% t 'minutes' %}</span>
+      <strong class="sale-amount">TZS {{ voucher.batch.plan.price|floatformat:0 }}</strong>
+    </div>
+    <form method="post" class="sale-form" action="{% url 'vouchers:sell' voucher.pk %}">{% csrf_token %}
+      <div class="field"><label for="{{ form.method.id_for_label }}">{% t 'Payment method' %}</label>{{ form.method }}{% for error in form.method.errors %}<small class="field-error">{{ error }}</small>{% endfor %}</div>
+      <div class="field"><label for="{{ form.notes.id_for_label }}">{% t 'Notes (optional)' %}</label>{{ form.notes }}{% for error in form.notes.errors %}<small class="field-error">{{ error }}</small>{% endfor %}</div>
+      <p class="sale-disclaimer">{% t 'Record the sale only after receiving payment. Internet starts when the customer redeems the voucher.' %}</p>
+      <button class="button button-primary" type="submit">{% t 'Confirm sale' %}</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

@@ -821,6 +821,59 @@ SW.update({
     'Name, phone or reference': 'Jina, simu au kumbukumbu',
 })
 
+# Short, customer-facing language added in the mobile and navigation polish.
+SW.update({
+    'Record voucher sale': 'Rekodi mauzo ya vocha',
+    'Confirm the payment received by your business.': 'Thibitisha malipo yaliyopokelewa na biashara yako.',
+    'Notes (optional)': 'Maelezo (si lazima)',
+    'Record the sale only after receiving payment. Internet starts when the customer redeems the voucher.':
+        'Rekodi mauzo baada ya kupokea malipo. Intaneti huanza mteja anapotumia vocha.',
+    'Confirm sale': 'Thibitisha mauzo',
+    'Voided': 'Imebatilishwa',
+    'Internet activated': 'Intaneti imewashwa',
+    'Activation pending': 'Inasubiri kuwashwa',
+    'Awaiting redemption': 'Inasubiri kutumika',
+    'Status': 'Hali',
+    'minutes': 'dakika',
+    'Redeemed': 'Zilizotumika',
+    'Cash & bank voucher sales': 'Mauzo ya vocha kwa fedha taslimu / benki',
+    'Collected directly by your business': 'Fedha zilizopokelewa moja kwa moja na biashara yako',
+    'Payments': 'Malipo',
+    'Customer payments and withdrawals': 'Malipo ya wateja na utoaji wa fedha',
+    'View payments': 'Angalia malipo',
+    'EvPay verified sales': 'Mauzo yaliyothibitishwa na EvPay',
+    'confirmed payments': 'malipo yaliyothibitishwa',
+    'Awaiting settlement': 'Inasubiri makabidhiano ya fedha',
+    'Awaiting cleared settlement': 'Inasubiri makabidhiano ya fedha zilizohakikiwa',
+    'Pending clearance': 'Inasubiri fedha kuidhinishwa',
+    'Cleared balance': 'Salio lililoidhinishwa',
+    'Withdrawal requests': 'Maombi ya kutoa fedha',
+    'Submit your Wi-Fi details for connection approval.': 'Wasilisha taarifa za Wi-Fi ili kuidhinishwa kuunganishwa.',
+    'Payment review completed.': 'Ukaguzi wa malipo umekamilika.',
+    'Your controller connection link:': 'Kiungo cha kuunganisha kidhibiti:',
+    'Keep the access point powered on while WorldLink verifies the connection.':
+        'Acha kifaa cha Wi-Fi kikiwa kimewashwa wakati WorldLink inakagua muunganisho.',
+    'Your router details': 'Taarifa za ruta yako',
+    'Enter the access point MAC address and exact Wi-Fi name.': 'Ingiza MAC ya kifaa na jina sahihi la Wi-Fi.',
+    'Only needed for an existing private controller.': 'Inahitajika tu ukiwa na kidhibiti chako binafsi.',
+    'What happens next': 'Hatua zinazofuata',
+    'Clear steps from request to approval.': 'Hatua za kutuma ombi hadi kuidhinishwa.',
+    'You submit': 'Unachowasilisha',
+    'Router model and serial number': 'Aina ya ruta na namba ya utambulisho',
+    'Access point MAC address': 'Anuani ya MAC ya kifaa cha Wi-Fi',
+    'Guest Wi-Fi name (SSID)': 'Jina la Wi-Fi ya wageni (SSID)',
+    'Your business location': 'Eneo la biashara yako',
+    'WorldLink reviews': 'WorldLink itakagua',
+    'Your business and device details': 'Taarifa za biashara na kifaa chako',
+    'Assigns your dedicated Omada site': 'Kukupa eneo lako la Omada',
+    'Checks the router is online': 'Kuhakikisha ruta imeunganishwa',
+    'Approves vouchers and live payments separately': 'Kuidhinisha vocha na malipo ya moja kwa moja tofauti',
+    'No router passwords or payment API keys are needed here.': 'Usiweke nywila za ruta wala funguo za API za malipo hapa.',
+    'Printed vouchers for cash and bank sales.': 'Vocha za kuchapisha kwa mauzo ya taslimu na benki.',
+    'Router status': 'Hali ya ruta',
+    'Awaiting connection check': 'Inasubiri ukaguzi wa muunganisho',
+})
+
 @register.simple_tag(takes_context=True)
 def t(context,phrase):
     request=context.get('request')

@@ -80,6 +80,43 @@ class VoucherOmadaTests(TestCase):
         })
         return result
 
+    def test_manual_sale_uses_own_page_and_preserves_sale_rules(self):
+        self.client.force_login(self.owner)
+        url = reverse('vouchers:sell', args=[self.voucher.pk])
+        batch_url = reverse('vouchers:batch_detail', args=[self.batch.pk])
+        batch = self.client.get(batch_url)
+        self.assertContains(batch, url)
+        self.assertNotContains(batch, '<select name="method"')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.voucher.code)
+        self.assertContains(response, 'Confirm sale')
+        self.assertEqual(self.client.post(url, {'method': 'INVALID'}).status_code, 400)
+        self.assertFalse(ManualSale.objects.filter(voucher=self.voucher).exists())
+        self.assertEqual(self.client.post(url, {'method': 'CASH'}).status_code, 302)
+        self.voucher.refresh_from_db()
+        self.assertEqual(self.voucher.status, Voucher.Status.SOLD)
+        self.assertEqual(ManualSale.objects.get(voucher=self.voucher).amount, self.plan.price)
+        self.assertEqual(self.client.get(url).status_code, 302)
+        self.assertEqual(self.client.post(url, {'method': 'BANK'}).status_code, 302)
+        self.assertEqual(ManualSale.objects.filter(voucher=self.voucher).count(), 1)
+        self.assertEqual(EvPayCollection.objects.count(), 0)
+
+    def test_manual_sale_page_respects_tenant_and_csrf(self):
+        self.client.force_login(self.owner)
+        foreign_voucher = Voucher.objects.create(company=self.other,
+            batch=VoucherBatch.objects.create(company=self.other,
+                plan=WifiPlan.objects.create(company=self.other, name='Other plan',
+                    duration_minutes=5, price=100), quantity=1, created_by=self.owner),
+            code='WHC-OTHERABC23')
+        self.assertEqual(self.client.get(reverse('vouchers:sell', args=[foreign_voucher.pk])).status_code, 404)
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.owner)
+        url = reverse('vouchers:sell', args=[self.voucher.pk])
+        self.assertEqual(client.get(url).status_code, 200)
+        self.assertEqual(client.post(url, {'method': 'CASH'}).status_code, 403)
+        self.assertFalse(ManualSale.objects.filter(voucher=self.voucher).exists())
+
     def test_new_business_needs_independent_staff_approval_and_online_router(self):
         self.assertFalse(approved_voucher_route(self.company, self.context['apMac'], 'NEW-WIFI'))
         self.client.force_login(self.owner)

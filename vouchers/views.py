@@ -45,8 +45,15 @@ def batch_detail(request,pk):
 @require_tenant('OWNER','MANAGER','CASHIER')
 def manual_sell(request,pk):
     voucher=get_object_or_404(Voucher.objects.select_related('batch__plan'),pk=pk,company=request.active_company)
+    if request.method=='GET':
+        if voucher.status!=Voucher.Status.READY:
+            messages.error(request,'This voucher is not available for sale.')
+            return redirect('vouchers:batch_detail',pk=voucher.batch_id)
+        return render(request,'vouchers/record_sale.html',{
+            'voucher':voucher,'form':ManualSaleForm(), 'page_title':'Record voucher sale',
+        })
     if request.method!='POST':
-        return redirect('vouchers:batch_detail',pk=voucher.batch_id)
+        return HttpResponse(status=405)
     form=ManualSaleForm(request.POST)
     if form.is_valid():
         try:
@@ -62,7 +69,9 @@ def manual_sell(request,pk):
         except IntegrityError:
             messages.error(request,'This voucher has already been sold.')
     else:
-        messages.error(request,'Could not record sale. Check the payment method.')
+        return render(request,'vouchers/record_sale.html',{
+            'voucher':voucher,'form':form,'page_title':'Record voucher sale',
+        },status=400)
     return redirect('vouchers:batch_detail',pk=voucher.batch_id)
 
 @require_tenant()

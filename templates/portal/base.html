@@ -9,7 +9,40 @@
   <title>{{ company.name }} · {{ w.guest_wifi }}</title>
   {% if company.logo %}<link rel="icon" type="image/png" href="{{ company.logo.url }}">{% else %}<link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">{% endif %}
   <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ app_css_version }}">
-  <style>:root { --portal-accent: {{ portal.accent_color }}; }</style>
+  <style>
+    :root { --portal-accent: {{ portal.accent_color }}; }
+    /* Captive browsers can load HTML before their hotspot grants CSS access.
+       Keep the guest page fitted to the device even on that first response. */
+    @media (max-width:760px) {
+      html { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+      body.guest-body { margin:0; width:100%; min-width:0; overflow-x:clip; background:#f5f8fb; color:#1d2d40; font:13px/1.55 system-ui,-apple-system,Segoe UI,sans-serif; }
+      .guest-body *, .guest-body *::before, .guest-body *::after { box-sizing:border-box; }
+      .guest-shell { box-sizing:border-box; width:100%; max-width:100%; min-width:0; padding:0 15px; margin:0 auto; }
+      .guest-header { display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:0; min-height:76px; }
+      .guest-brand { display:flex; align-items:center; gap:9px; min-width:0; }
+      .guest-logo { display:grid; place-items:center; width:40px; height:40px; flex:0 0 40px; overflow:hidden; border-radius:10px; }
+      .guest-logo img { display:block; width:100%; height:100%; object-fit:contain; }
+      .guest-logo svg { display:block; width:24px; height:24px; }
+      .guest-plan-icon svg { display:block; width:23px; height:23px; }
+      .guest-brand-copy { display:flex; flex-direction:column; min-width:0; }
+      .guest-brand-copy strong { display:block; max-width:200px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:13px; }
+      .guest-brand-copy small { font-size:11px; }
+      .guest-language { flex:0 0 auto; display:flex; }
+      .guest-language a { display:grid; place-items:center; min-width:42px; min-height:42px; }
+      .guest-main,.guest-hero,.guest-bottom-grid,.guest-plan-grid,.guest-plan,.guest-info,.guest-voucher-content { min-width:0; max-width:100%; }
+      .guest-plan-grid,.guest-bottom-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; }
+      .guest-main { padding:28px 0 34px; }
+      .guest-hero { text-align:center; margin:0 auto 25px; }
+      .guest-hero h1 { font-size:clamp(22px,6vw,27px); line-height:1.25; }
+      .guest-plan,.guest-info { width:100%; padding:17px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; }
+      .guest-info { display:flex; align-items:flex-start; gap:12px; }
+      .guest-plan-specs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+      .guest-primary { display:block; text-align:center; padding:12px; border-radius:8px; background:var(--portal-accent,#13788a); color:#fff; text-decoration:none; }
+      .guest-form,.guest-voucher-form { min-width:0; max-width:100%; }
+      .guest-voucher-form { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; }
+      .guest-body :is(input:not([type="hidden"]),select,textarea) { font-size:16px!important; max-width:100%; }
+    }
+  </style>
 </head>
 <body class="guest-body">
   <div class="guest-topline"></div>

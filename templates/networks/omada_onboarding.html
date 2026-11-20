@@ -4,7 +4,7 @@
   <div>
     <p class="eyebrow">{% t 'NETWORK · TP-LINK OMADA' %}</p>
     <h1>{% t 'Set up' %} {{ router.name }}</h1>
-    <p>{% t 'Register your access point once. WorldLink will review it and connect it to the central controller.' %}</p>
+    <p>{% t 'Submit your Wi-Fi details for connection approval.' %}</p>
   </div>
   <a class="button button-secondary" href="{% url 'networks:routers' %}">← {% t 'Routers' %}</a>
 </div>
@@ -14,15 +14,10 @@
   <div><span class="onboard-step">03</span><strong>{% t 'WorldLink review' %}</strong><small>{% if profile.status == 'REVIEWED' %}{% t 'Site assigned' %}{% else %}{% t 'Pending approval' %}{% endif %}</small></div>
   <div><span class="onboard-step">04</span><strong>{% t 'Live Wi-Fi' %}</strong><small>{% if profile.live_payments_approved_at %}{% t 'Staff-approved; activation gate applies' %}{% else %}{% t 'Needs hardware test and payment approval' %}{% endif %}</small></div></div>
 
-<div class="integration-notice important">
-  {% t 'No VPN, Tailscale or Omada server is required for the recommended WorldLink connection.' %}
-  {% t 'Approval and router adoption are separate steps. Payments and customer internet are enabled only after additional live testing.' %}
-</div>
-
 {% if profile %}
-<div class="router-notice">
+<div class="router-notice onboard-current-status">
   <strong>{% t 'Current request:' %} {% t profile.get_status_display %}</strong>
-  {% if profile.live_payments_approved_at %}<p><strong>{% t 'WorldLink payment approval recorded:' %}</strong> {% t 'Your router is approved by staff, but checkout also requires live payment allowlist and rollout approval.' %}</p>{% endif %}
+  {% if profile.live_payments_approved_at %}<p>{% t 'Payment review completed.' %}</p>{% endif %}
   {% if profile.submitted_at %}<p>{% t 'Sent' %} {{ profile.submitted_at|date:'d M Y H:i' }}.</p>{% endif %}
   {% if profile.review_note %}<p>{% t 'Message from WorldLink:' %} {{ profile.review_note }}</p>{% endif %}
   {% if profile.status == 'REVIEWED' and profile.connection_mode == 'CENTRAL' %}
@@ -31,26 +26,25 @@
       <p><strong>{% t 'Live access-point status:' %}</strong> {% t observation.get_state_display %} ({% t 'checked' %} {{ observation.checked_at|date:'d M Y H:i:s' }}).</p>
     {% else %}<p><strong>{% t 'Access point:' %}</strong> {% t 'Awaiting a recent controller verification.' %}</p>{% endif %}
     {% if profile.managed_site.inform_url %}
-      <p>{% t 'Use this exact Controller Inform URL in your Omada access point. You may need to release it from its old controller first.' %}</p>
+      <p>{% t 'Your controller connection link:' %}</p>
       <p class="mono" style="overflow-wrap:anywhere;user-select:all"><strong>{{ profile.managed_site.inform_url }}</strong></p>
-      <p>{% t 'Keep the AP powered and connected to the internet. WorldLink completes adoption and approval in Omada. Do not share controller passwords.' %}</p>
+      <p>{% t 'Keep the access point powered on while WorldLink verifies the connection.' %}</p>
     {% else %}<p>{% t 'WorldLink will provide your controller inform link after the central hostname is configured.' %}</p>{% endif %}
-    <p><small>{% t 'Connected means the AP was seen by the controller; it does not mean paid guest access is enabled.' %}</small></p>
   {% elif profile.status == 'REVIEWED' %}<p>{% t 'Details reviewed. A secure controller connection and live activation still need separate approval and testing.' %}</p>{% endif %}
 </div>
 {% endif %}
 
 <div class="onboard-layout">
   <section class="panel">
-    <div class="panel-heading"><div><h2>{% t 'Access point and guest Wi-Fi' %}</h2><p>{% t 'Choose WorldLink central Omada for the easiest setup. No password or API key needed.' %}</p></div></div>
+    <div class="panel-heading"><div><h2>{% t 'Your router details' %}</h2><p>{% t 'Enter the access point MAC address and exact Wi-Fi name.' %}</p></div></div>
     <form method="post" class="onboard-form" autocomplete="off">{% csrf_token %}
       {% for field in form %}
       {% if field.name == 'controller_origin' %}<details class="span-2" {% if form.connection_mode.value == 'VPN' %}open{% endif %}>
         <summary>{% t 'Advanced: I already operate my own Omada controller' %}</summary><div class="onboard-advanced">{% endif %}
       <div class="field {% if field.name == 'setup_notes' or field.name == 'connection_mode' %}span-2{% endif %}">
         <label for="{{ field.id_for_label }}">{% t field.label %}</label>{{ field }}
-        {% if field.name == 'controller_origin' or field.name == 'controller_id' %}<small class="field-hint">{% t 'Only for businesses connecting a separate private controller; leave blank for WorldLink central Omada.' %}</small>{% endif %}
-        {% if field.help_text %}<small class="field-hint">{% t field.help_text %}</small>{% endif %}
+        {% if field.name == 'controller_origin' or field.name == 'controller_id' %}<small class="field-hint">{% t 'Only needed for an existing private controller.' %}</small>{% endif %}
+        {% if field.name == 'ap_mac' or field.name == 'ssid_name' %}{% if field.help_text %}<small class="field-hint">{% t field.help_text %}</small>{% endif %}{% endif %}
         {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
       </div>
       {% if field.name == 'controller_id' %}</div></details>{% endif %}
@@ -63,16 +57,12 @@
     </form>
   </section>
   <section class="panel">
-    <div class="panel-heading"><div><h2>{% t 'Four simple steps' %}</h2><p>{% t 'Works for businesses in different locations.' %}</p></div></div>
-    <ol class="router-steps">
-      <li>{% t 'Add your TP-Link Omada router, model and serial number from its label under Routers.' %}</li>
-      <li>{% t 'Select WorldLink central Omada, enter the AP MAC and your guest Wi-Fi name.' %}</li>
-      <li>{% t 'Send for review. WorldLink assigns a separate site and provides a controller Inform URL.' %}</li>
-      <li>{% t 'Enter the Inform URL in your access point settings. WorldLink tests the connection and paid Wi-Fi separately.' %}</li>
-    </ol>
-    <div class="router-notice"><strong>{% t 'Important:' %}</strong> {% t 'This onboarding form is not a hotspot operator login.' %}
-      {% t 'WorldLink will never ask you to paste router, controller or EvPay passwords here.' %}
-      {% t 'Each business has its own site. A new request cannot collect live customer payments or enable access by itself.' %}</div>
+    <div class="panel-heading"><div><h2>{% t 'What happens next' %}</h2><p>{% t 'Clear steps from request to approval.' %}</p></div></div>
+    <div class="review-checklist">
+      <div class="review-section"><span class="review-section-icon">01</span><div><h3>{% t 'You submit' %}</h3><ul><li>{% t 'Router model and serial number' %}</li><li>{% t 'Access point MAC address' %}</li><li>{% t 'Guest Wi-Fi name (SSID)' %}</li><li>{% t 'Your business location' %}</li></ul></div></div>
+      <div class="review-section"><span class="review-section-icon">02</span><div><h3>{% t 'WorldLink reviews' %}</h3><ul><li>{% t 'Your business and device details' %}</li><li>{% t 'Assigns your dedicated Omada site' %}</li><li>{% t 'Checks the router is online' %}</li><li>{% t 'Approves vouchers and live payments separately' %}</li></ul></div></div>
+      <p class="review-footnote">{% t 'No router passwords or payment API keys are needed here.' %}</p>
+    </div>
   </section>
 </div>
 {% endblock %}
