@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views, evpay_views
+from . import views, evpay_views, collection_views
 urlpatterns = [
     path('', views.orders, name='orders'),
     path('evpay/', evpay_views.lab, name='evpay_lab'),
@@ -7,6 +7,9 @@ urlpatterns = [
     path('evpay/start/', evpay_views.create_test, name='evpay_start'),
     path('evpay/reconcile/<int:pk>/', evpay_views.reconcile_test, name='evpay_reconcile'),
     path('evpay/webhook/<slug:token>/', evpay_views.webhook, name='evpay_webhook'),
+    path('evpay/collections/webhook/<slug:token>/', collection_views.webhook, name='collection_webhook'),
+    path('evpay/collections/', collection_views.business_collections, name='business_collections'),
+    path('evpay/collections/<int:pk>/reconcile/', collection_views.reconcile, name='collection_reconcile'),
     path('order/<int:pk>/', views.order_detail, name='order_detail'),
     path('order/<int:pk>/verify/', views.verify_order, name='verify'),
     path('order/<int:pk>/cancel/', views.cancel_order, name='cancel'),

@@ -87,6 +87,14 @@ def callback_url():
     return settings.EVPAY_PUBLIC_BASE_URL.rstrip('/') + '/payments/evpay/webhook/' + settings.EVPAY_WEBHOOK_TOKEN + '/'
 
 
+def collection_callback_url():
+    ensure_settings_ready(require_callback=True)
+    if not getattr(settings, 'EVPAY_COLLECTION_WEBHOOK_TOKEN', ''):
+        raise EvPayError('EVPAY_COLLECTION_WEBHOOK_TOKEN is required for public checkout.')
+    return (settings.EVPAY_PUBLIC_BASE_URL.rstrip('/') + '/payments/evpay/collections/webhook/'
+            + settings.EVPAY_COLLECTION_WEBHOOK_TOKEN + '/')
+
+
 class _NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         # Never forward merchant authorization to a redirected host.
@@ -263,6 +271,31 @@ def initiate_ussd(test):
         'narrative': 'WorldLink payment gateway validation',
     }
     return _request('POST', '/api/v1/payment/ussd', payload, token=access_token(), signed=True, idem_key=test.reference)
+
+
+def initiate_collection(collection):
+    """Send one server-priced customer USSD push to WorldLink's merchant account."""
+    amount = Decimal(collection.amount)
+    if amount != amount.to_integral_value() or amount < 100 or amount > settings.EVPAY_PUBLIC_MAX_AMOUNT_TZS:
+        raise EvPayError('This package is outside the approved public USSD collection amount range.')
+    if collection.environment != settings.EVPAY_ENVIRONMENT:
+        raise EvPayError('Payment environment changed; do not retry this collection.')
+    if not (getattr(settings, 'EVPAY_PUBLIC_CHECKOUT_ENABLED', False)
+            and collection.company_id in settings.EVPAY_COLLECTION_COMPANY_IDS):
+        raise EvPayError('Public collection is not approved for this business.')
+    payload = {
+        'fsOperator': collection.operator,
+        'amount': int(amount),
+        'product': ('WorldLink Wi-Fi: ' + collection.plan.name)[:128],
+        'callbackUrl': collection_callback_url(),
+        'payerAccountId': normalize_msisdn(collection.phone),
+        'requestId': collection.reference,
+        'currency': 'TZS',
+        'payerName': collection.customer_name[:128],
+        'narrative': ('Wi-Fi ' + collection.reference)[:256],
+    }
+    return _request('POST', '/api/v1/payment/ussd', payload,
+                    token=access_token(), signed=True, idem_key=collection.reference)
 
 
 def retrieve_ussd(reference):

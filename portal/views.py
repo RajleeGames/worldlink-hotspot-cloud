@@ -1,4 +1,9 @@
+import hashlib
+import uuid
+
 from django.contrib import messages
+from django.conf import settings as django_settings
+from django.core.cache import cache
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
@@ -7,9 +12,13 @@ from django.utils import timezone
 from tenants.models import Company
 from tenants.utils import require_tenant
 from networks.models import WifiPlan
-from payments.models import PaymentMethod, PaymentOrder
-from payments.forms import PublicOrderForm
+from payments.models import PaymentMethod, PaymentOrder, EvPayCollection
+from payments.forms import PublicOrderForm, PublicEvPayForm
 from payments.services import create_pending_order
+from payments.collections import collection_enabled_for
+from payments.evpay import EvPayError, initiate_collection
+from payments.collections import start_collection
+from payments.omada import controller_context, recent_controller_context
 from .models import CaptivePortal
 from .forms import CaptivePortalForm
 from .words import words_for
@@ -49,10 +58,15 @@ def settings(request):
 @require_http_methods(['GET'])
 def public(request, slug):
     company, portal = _business(slug)
+    controller_context(request, company)
     lang = _locale(request)
     plans = WifiPlan.objects.filter(company=company, is_active=True).order_by('price', 'id')
     methods = PaymentMethod.objects.filter(company=company, is_active=True).count()
-    return render(request, 'portal/public.html', {**_context(company, portal, lang), 'plans': plans, 'methods_count': methods})
+    return render(request, 'portal/public.html', {
+        **_context(company, portal, lang), 'plans': plans, 'methods_count': methods,
+        'evpay_available': collection_enabled_for(company)
+        and bool(recent_controller_context(request, company)),
+    })
 
 
 @require_http_methods(['GET', 'POST'])
@@ -86,6 +100,67 @@ def order_status(request, slug, public_id):
     company, portal = _business(slug)
     order = get_object_or_404(PaymentOrder.objects.select_related('method', 'plan'), company=company, public_id=public_id)
     response = render(request, 'portal/status.html', {**_context(company, portal, _locale(request)), 'order': order})
+    response['Cache-Control'] = 'private, no-store'
+    response['Referrer-Policy'] = 'no-referrer'
+    return response
+
+
+@require_http_methods(['GET', 'POST'])
+def evpay_checkout(request, slug, plan_id):
+    company, portal = _business(slug)
+    if not collection_enabled_for(company):
+        raise Http404('Live mobile-money collection is not yet available.')
+    plan = get_object_or_404(WifiPlan, company=company, pk=plan_id, is_active=True)
+    if plan.price < 100 or plan.price > django_settings.EVPAY_PUBLIC_MAX_AMOUNT_TZS:
+        raise Http404('Package is not approved for this pilot.')
+    nonce = request.session.setdefault('whc_evpay_checkout_nonce', str(uuid.uuid4()))
+    form = PublicEvPayForm(request.POST or None, initial={'nonce': nonce})
+    if request.method == 'POST' and form.is_valid():
+        if str(form.cleaned_data['nonce']) != nonce:
+            form.add_error(None, 'Checkout expired. Reload before trying again.')
+        else:
+            data = form.cleaned_data
+            # Short guard only. Live deployment must use a shared Redis cache.
+            key = 'whc-public-push-' + hashlib.sha256(
+                f"{company.pk}:{data['phone']}".encode('ascii')).hexdigest()
+            if not cache.add(key, 1, timeout=60):
+                form.add_error(None, 'A USSD push was sent recently to this phone. Check it before trying again.')
+            else:
+                try:
+                    collection, created = start_collection(company=company, plan=plan,
+                        name=data['customer_name'], phone=data['phone'],
+                        operator=data['operator'], nonce=data['nonce'],
+                        omada_context=recent_controller_context(request, company))
+                except ValueError as exc:
+                    cache.delete(key)
+                    form.add_error(None, str(exc))
+                else:
+                    request.session.pop('whc_evpay_checkout_nonce', None)
+                    if created:
+                        try:
+                            reply = initiate_collection(collection)
+                        except EvPayError:
+                            # Never auto-retry an uncertain real debit.
+                            EvPayCollection.objects.filter(pk=collection.pk, status='CREATED').update(
+                                status='UNKNOWN', last_error='Provider response unconfirmed; reconcile the original reference.')
+                        else:
+                            EvPayCollection.objects.filter(pk=collection.pk, status='CREATED').update(
+                                status='PENDING', transaction_id=str(reply.get('transactionId') or '')[:100])
+                    url = reverse('portal:evpay_status', kwargs={'slug': slug, 'public_id': collection.public_id})
+                    return redirect(f'{url}?lang={_locale(request)}')
+    return render(request, 'portal/evpay_checkout.html', {
+        **_context(company, portal, _locale(request)), 'plan': plan, 'form': form,
+    })
+
+
+@require_http_methods(['GET'])
+def evpay_status(request, slug, public_id):
+    company, portal = _business(slug)
+    collection = get_object_or_404(EvPayCollection.objects.select_related('plan'),
+                                   company=company, public_id=public_id)
+    response = render(request, 'portal/evpay_status.html', {
+        **_context(company, portal, _locale(request)), 'collection': collection,
+    })
     response['Cache-Control'] = 'private, no-store'
     response['Referrer-Policy'] = 'no-referrer'
     return response

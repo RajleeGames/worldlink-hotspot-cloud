@@ -3,10 +3,11 @@ import uuid
 
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
+from django.http import Http404
 
 from tenants.models import Company
 from tenants.utils import require_tenant
@@ -17,6 +18,9 @@ from .services import (
     cancel_withdrawal, claim_withdrawal, finish_withdrawal, record_settled_collection,
     request_withdrawal, review_destination,
 )
+from django.db.models import Sum
+from payments.models import EvPayCollection
+from payments.collections import EARNING_STATUSES
 
 
 def _balance(company):
@@ -31,10 +35,16 @@ def dashboard(request):
     destinations = WithdrawalDestination.objects.filter(company=company)
     withdrawals = WithdrawalRequest.objects.filter(company=company).select_related('destination', 'requested_by')[:30]
     collections = SettledCollection.objects.filter(wallet__company=company)[:15]
+    evpay = EvPayCollection.objects.filter(company=company, status__in=EARNING_STATUSES)
+    uncredited = evpay.exclude(reference__in=SettledCollection.objects.filter(
+        wallet__company=company).values('source_reference'))
     return render(request, 'wallets/dashboard.html', {
         'page_title': 'Money & withdrawals', 'wallet': wallet,
         'destinations': destinations, 'withdrawals': withdrawals, 'collections': collections,
         'can_withdraw': request.active_membership.role == 'OWNER',
+        'evpay_verified_total': evpay.aggregate(total=Sum('amount'))['total'] or 0,
+        'evpay_waiting_clearance': uncredited.aggregate(total=Sum('amount'))['total'] or 0,
+        'recent_evpay': evpay.select_related('plan')[:15],
     })
 
 
@@ -110,11 +120,14 @@ def queue(request):
     pending = WithdrawalRequest.objects.filter(status__in=['REQUESTED', 'PROCESSING']).select_related('company', 'destination', 'requested_by')
     numbers = WithdrawalDestination.objects.filter(status='PENDING').select_related('company', 'created_by')
     recent = WithdrawalRequest.objects.exclude(status__in=['REQUESTED', 'PROCESSING']).select_related('company')[:20]
+    waiting_evpay = EvPayCollection.objects.filter(status__in=EARNING_STATUSES).exclude(
+        reference__in=SettledCollection.objects.values('source_reference')).select_related('company', 'plan')[:30]
     return render(request, 'wallets/queue.html', {
         'page_title': 'Withdrawals · WorldLink', 'pending': pending, 'numbers': numbers,
         'recent': recent, 'can_manage_finance': platform_can_manage(request.user),
         'wallet_total': sum((w.available for w in BusinessWallet.objects.all()), 0),
         'reserved_total': sum((w.reserved for w in BusinessWallet.objects.all()), 0),
+        'waiting_evpay': waiting_evpay,
     })
 
 
@@ -200,3 +213,31 @@ def collection_new(request):
             return redirect('wallets:queue')
     return render(request, 'wallets/collection.html', {'page_title': 'Record cleared collection',
         'form': form, 'company': company, 'companies': Company.objects.order_by('name')})
+
+
+@platform_required(manage=True)
+@require_POST
+def evpay_clearance(request, pk):
+    """Finance moves a *specific* provider-confirmed payment into withdrawable funds.
+
+    Settlement is never inferred from an EvPay payment success notification.
+    Staff must first check the independent WorldLink merchant/bank statement.
+    """
+    evidence = request.POST.get('settlement_reference', '').strip()
+    if len(evidence) < 6 or len(evidence) > 100:
+        messages.error(request, 'Enter the actual cleared WorldLink statement reference (6–100 characters).')
+        return redirect('wallets:queue')
+    try:
+        with transaction.atomic():
+            payment = get_object_or_404(EvPayCollection.objects.select_for_update(), pk=pk)
+            if payment.status not in EARNING_STATUSES:
+                raise ValueError('EvPay has not confirmed this transaction or it was reversed.')
+            record_settled_collection(company=payment.company, actor=request.user,
+                amount=payment.amount, source_reference=payment.reference,
+                settlement_reference=evidence)
+    except (ValueError, IntegrityError) as exc:
+        messages.error(request, str(exc) if isinstance(exc, ValueError)
+                       else 'This payment has already been cleared.')
+    else:
+        messages.success(request, 'Cleared EvPay collection added to the correct business wallet.')
+    return redirect('wallets:queue')

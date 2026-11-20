@@ -114,3 +114,34 @@ EVPAY_CLIENT_SECRET = os.environ.get('EVPAY_CLIENT_SECRET', '')
 EVPAY_SIG_KEY = os.environ.get('EVPAY_SIG_KEY', '')
 EVPAY_WEBHOOK_SECRET = os.environ.get('EVPAY_WEBHOOK_SECRET', '')
 EVPAY_WEBHOOK_TOKEN = os.environ.get('EVPAY_WEBHOOK_TOKEN', '')
+
+# Separate, explicitly approved multi-business collection pilot. WorldLink is
+# the sole EvPay merchant; the business IDs are accounting attribution only.
+# Disable by default, especially until the merchant agreement permits this.
+EVPAY_PUBLIC_CHECKOUT_ENABLED = flag('EVPAY_PUBLIC_CHECKOUT_ENABLED', False)
+EVPAY_COLLECTION_COMPANY_IDS = {
+    int(item) for item in os.environ.get('EVPAY_COLLECTION_COMPANY_IDS', '').split(',')
+    if item.strip().isdigit() and int(item) > 0
+}
+EVPAY_COLLECTION_WEBHOOK_TOKEN = os.environ.get('EVPAY_COLLECTION_WEBHOOK_TOKEN', '')
+EVPAY_PUBLIC_MAX_AMOUNT_TZS = int(os.environ.get('EVPAY_PUBLIC_MAX_AMOUNT_TZS') or '1000')
+
+# Real-money public USSD throttling must work across every gunicorn worker.
+# Never rely on Django's default per-process LocMemCache for live payments.
+WHC_REDIS_URL = os.environ.get('WHC_REDIS_URL', '').strip()
+if WHC_REDIS_URL:
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+                           'LOCATION': WHC_REDIS_URL,
+                           'KEY_PREFIX': 'worldlink-hotspot'}}
+
+# One EAP/one company pilot. Additional independent businesses require an
+# explicitly configured controller and verified merchant/submerchant agreement.
+OMADA_LIVE_ENABLED = flag('OMADA_LIVE_ENABLED', False)
+OMADA_PILOT_COMPANY_ID = int(os.environ.get('OMADA_PILOT_COMPANY_ID') or '0')
+OMADA_CONTROLLER_URL = os.environ.get('OMADA_CONTROLLER_URL', '').rstrip('/')
+OMADA_CONTROLLER_ID = os.environ.get('OMADA_CONTROLLER_ID', '')
+OMADA_OPERATOR_NAME = os.environ.get('OMADA_OPERATOR_NAME', '')
+OMADA_OPERATOR_PASSWORD = os.environ.get('OMADA_OPERATOR_PASSWORD', '')
+OMADA_CA_FILE = os.environ.get('OMADA_CA_FILE', '')
+OMADA_AP_MAC = os.environ.get('OMADA_AP_MAC', '').upper()
+OMADA_SSID = os.environ.get('OMADA_SSID', '')

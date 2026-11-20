@@ -58,3 +58,22 @@ class EvPayTestForm(forms.Form):
             return normalize_msisdn(self.cleaned_data['phone'])
         except ValueError as exc:
             raise forms.ValidationError(str(exc)) from exc
+
+
+class PublicEvPayForm(forms.Form):
+    customer_name = forms.CharField(min_length=2, max_length=90,
+        widget=forms.TextInput(attrs={'class': 'input', 'autocomplete': 'name'}))
+    phone = forms.CharField(max_length=20,
+        widget=forms.TextInput(attrs={'class': 'input', 'inputmode': 'tel',
+                                       'autocomplete': 'tel', 'placeholder': '0712 345 678'}))
+    operator = forms.ChoiceField(choices=EvPayTestForm.base_fields['operator'].choices,
+        widget=forms.Select(attrs={'class': 'input'}))
+    authorized = forms.BooleanField(required=True)
+    nonce = forms.UUIDField(widget=forms.HiddenInput)
+
+    def clean_phone(self):
+        from .evpay import normalize_msisdn
+        try:
+            return normalize_msisdn(self.cleaned_data['phone'])
+        except ValueError as exc:
+            raise forms.ValidationError(str(exc)) from exc

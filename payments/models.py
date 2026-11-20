@@ -107,3 +107,67 @@ class EvPayDelivery(models.Model):
     event = models.CharField(max_length=40)
     status = models.CharField(max_length=14)
     received_at = models.DateTimeField(auto_now_add=True)
+
+
+class EvPayCollection(models.Model):
+    """Real customer collection into WorldLink's *one* EvPay merchant account.
+
+    Every entry belongs to exactly one business.  Provider-confirmed collections
+    are displayed as earnings; they are NOT automatically withdrawable until
+    WorldLink separately confirms funds have cleared.
+    """
+
+    class Status(models.TextChoices):
+        CREATED = 'CREATED', 'Created'
+        PENDING = 'PENDING', 'Awaiting phone approval'
+        UNKNOWN = 'UNKNOWN', 'Checking payment status'
+        PROCESSING = 'PROCESSING', 'Processing'
+        ON_HOLD = 'ON-HOLD', 'On hold'
+        SUCCESS = 'SUCCESS', 'Payment confirmed'
+        SETTLED = 'SETTLED', 'Settled at EvPay'
+        FAILED = 'FAILED', 'Failed'
+        REFUNDED = 'REFUNDED', 'Refunded'
+        REVERSED = 'REVERSED', 'Reversed'
+
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, related_name='evpay_collections')
+    plan = models.ForeignKey(WifiPlan, on_delete=models.PROTECT, related_name='evpay_collections')
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    checkout_nonce = models.UUIDField(unique=True, editable=False)
+    reference = models.CharField(max_length=40, unique=True, editable=False)
+    customer_name = models.CharField(max_length=90)
+    phone = models.CharField(max_length=15)
+    operator = models.CharField(max_length=20, choices=EvPayTestPayment.OPERATOR_CHOICES)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(100)])
+    environment = models.CharField(max_length=10)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.CREATED)
+    transaction_id = models.CharField(max_length=100, blank=True)
+    fsp_reference = models.CharField(max_length=100, blank=True)
+    last_error = models.CharField(max_length=250, blank=True)
+    last_checked_at = models.DateTimeField(null=True, blank=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    # Captured from Omada's external captive-portal redirect, not user form.
+    client_mac = models.CharField(max_length=24, blank=True)
+    client_ip = models.GenericIPAddressField(null=True, blank=True)
+    ap_mac = models.CharField(max_length=24, blank=True)
+    ssid_name = models.CharField(max_length=100, blank=True)
+    radio_id = models.PositiveSmallIntegerField(null=True, blank=True)
+    omada_activated_at = models.DateTimeField(null=True, blank=True)
+    omada_last_error = models.CharField(max_length=250, blank=True)
+    omada_claimed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['company', 'status', 'created_at'], name='evpay_live_company_status')]
+        constraints = [models.UniqueConstraint(fields=['transaction_id'],
+            condition=~models.Q(transaction_id=''), name='evpay_live_unique_txn')]
+
+
+class EvPayCollectionDelivery(models.Model):
+    """Delivery idempotency and audit, separate from the isolated EvPay lab."""
+
+    collection = models.ForeignKey(EvPayCollection, on_delete=models.PROTECT, related_name='deliveries')
+    delivery_id = models.CharField(max_length=100, unique=True)
+    event = models.CharField(max_length=40)
+    status = models.CharField(max_length=12)
+    received_at = models.DateTimeField(auto_now_add=True)

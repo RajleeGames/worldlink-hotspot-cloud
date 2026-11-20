@@ -20,6 +20,8 @@ from tenants.utils import require_tenant,active_membership
 from networks.models import Router, WifiPlan,Location
 from vouchers.models import Voucher,ManualSale,VoucherBatch
 from hotspots.models import HotspotCustomer, HotspotSession
+from payments.models import EvPayCollection
+from payments.collections import EARNING_STATUSES
 
 class LoginPage(LoginView):
     form_class = EmailLoginForm
@@ -95,6 +97,8 @@ def dashboard(request):
         'ready_count':Voucher.objects.filter(company=company,status=Voucher.Status.READY).count(),
         'sold_count':Voucher.objects.filter(company=company,status=Voucher.Status.SOLD).count(),
         'total_sales':ManualSale.objects.filter(company=company).aggregate(total=Sum('amount'))['total'] or 0,
+        'evpay_confirmed_total':EvPayCollection.objects.filter(company=company, status__in=EARNING_STATUSES).aggregate(total=Sum('amount'))['total'] or 0,
+        'evpay_confirmed_count':EvPayCollection.objects.filter(company=company, status__in=EARNING_STATUSES).count(),
         'total_expenses':Expense.objects.filter(company=company).aggregate(total=Sum('amount'))['total'] or 0,
         'recent_sales':ManualSale.objects.filter(company=company).select_related('voucher__batch__plan','recorded_by')[:6],
         'recent_routers':Router.objects.filter(company=company).select_related('location')[:5],

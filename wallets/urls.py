@@ -12,4 +12,5 @@ urlpatterns = [
     path('worldlink/withdrawals/<int:pk>/claim/', views.withdrawal_claim, name='withdrawal_claim'),
     path('worldlink/withdrawals/<int:pk>/review/', views.withdrawal_review, name='withdrawal_review'),
     path('worldlink/collections/new/', views.collection_new, name='collection_new'),
+    path('worldlink/evpay/<int:pk>/clearance/', views.evpay_clearance, name='evpay_clearance'),
 ]
