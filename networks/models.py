@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.core.validators import MinValueValidator
+from django.utils import timezone
 from tenants.models import Company
 
 class Location(models.Model):
@@ -77,6 +78,45 @@ class OmadaOnboarding(models.Model):
 
     def __str__(self):
         return f'{self.router.name}: {self.get_status_display()}'
+
+
+class OmadaDeviceObservation(models.Model):
+    """Last read-only controller observation; NOT authorization to sell Wi-Fi."""
+
+    class State(models.TextChoices):
+        CONNECTED = 'CONNECTED', 'Connected'
+        OFFLINE = 'OFFLINE', 'Offline'
+        NOT_FOUND = 'NOT_FOUND', 'AP not found'
+        UNKNOWN = 'UNKNOWN', 'Status not recognized'
+        ERROR = 'ERROR', 'Controller unavailable'
+
+    router = models.OneToOneField(Router, on_delete=models.CASCADE, related_name='omada_observation')
+    state = models.CharField(max_length=12, choices=State.choices, default=State.UNKNOWN)
+    reported_status = models.CharField(max_length=60, blank=True)
+    checked_at = models.DateTimeField()
+
+    @property
+    def is_fresh(self):
+        """Never present an old controller observation as a current online AP."""
+        if not self.checked_at or not 0 <= (timezone.now() - self.checked_at).total_seconds() <= 120:
+            return False
+        from payments.omada import normalize_mac
+        profile = getattr(self.router, 'omada_onboarding', None)
+        if (not settings.OMADA_LIVE_ENABLED or self.router.company_id != settings.OMADA_PILOT_COMPANY_ID
+                or self.router.family != Router.Family.OMADA or not profile
+                or profile.status != OmadaOnboarding.Status.REVIEWED or not profile.reviewed_by_id
+                or profile.connection_mode != OmadaOnboarding.ConnectionMode.VPN
+                or profile.controller_origin.rstrip('/') != settings.OMADA_CONTROLLER_URL.rstrip('/')
+                or profile.controller_id != settings.OMADA_CONTROLLER_ID
+                or profile.ssid_name != settings.OMADA_SSID):
+            return False
+        try:
+            return normalize_mac(profile.ap_mac) == normalize_mac(settings.OMADA_AP_MAC)
+        except ValueError:
+            return False
+
+    def __str__(self):
+        return f'{self.router.name}: {self.state}'
 
 class WifiPlan(models.Model):
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='wifi_plans')

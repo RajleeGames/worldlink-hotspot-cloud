@@ -145,3 +145,10 @@ OMADA_OPERATOR_PASSWORD = os.environ.get('OMADA_OPERATOR_PASSWORD', '')
 OMADA_CA_FILE = os.environ.get('OMADA_CA_FILE', '')
 OMADA_AP_MAC = os.environ.get('OMADA_AP_MAC', '').upper()
 OMADA_SSID = os.environ.get('OMADA_SSID', '')
+
+# Optional, read-only Open API monitoring of the EXISTING single-company pilot.
+# Keep credentials on the VPS, never in tenant forms or version control.
+OMADA_OPENAPI_CLIENT_ID = os.environ.get('OMADA_OPENAPI_CLIENT_ID', '').strip()
+OMADA_OPENAPI_CLIENT_SECRET = os.environ.get('OMADA_OPENAPI_CLIENT_SECRET', '').strip()
+OMADA_OPENAPI_API_KEY = os.environ.get('OMADA_OPENAPI_API_KEY', '').strip()
+OMADA_OPENAPI_SITE_ID = os.environ.get('OMADA_OPENAPI_SITE_ID', '').strip()

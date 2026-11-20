@@ -14,7 +14,7 @@ from .mikrotik import MikroTikClient, RouterConnectionError
 
 @require_tenant()
 def router_list(request):
-    routers = Router.objects.filter(company=request.active_company).select_related('location', 'omada_onboarding').annotate(
+    routers = Router.objects.filter(company=request.active_company).select_related('location', 'omada_onboarding', 'omada_observation').annotate(
         synced_vouchers=Count('voucher_syncs')
     )
     return render(request, 'networks/routers.html', {'routers': routers, 'page_title': 'Routers'})

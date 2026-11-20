@@ -139,6 +139,8 @@ def shell_context(request):
         'breadcrumbs':build_breadcrumbs(request) if request.user.is_authenticated else [],
         'active_company':membership.company if membership else None,
         'evpay_pilot_available': bool(membership and settings.EVPAY_ENABLED and settings.EVPAY_COMPANY_ID == membership.company_id),
+        'omada_paid_pilot_enabled': bool(membership and settings.OMADA_LIVE_ENABLED
+                                         and settings.OMADA_PILOT_COMPANY_ID == membership.company_id),
         'ui_lang':request.session.get('ui_lang','en'),
         'allow_signup':settings.ALLOW_PUBLIC_SIGNUP,
         'platform_brand':PlatformBranding.objects.first(),

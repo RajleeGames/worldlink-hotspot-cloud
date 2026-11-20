@@ -113,7 +113,7 @@
     </header>
     <main class="content" id="main-content">
       {% if messages %}<div class="flash-stack">{% for message in messages %}<div class="flash {{ message.tags }}" role="status">{{ message }}<button class="flash-dismiss" type="button" data-dismiss aria-label="Close">×</button></div>{% endfor %}</div>{% endif %}
-      <div class="integration-notice"><span class="notice-dot"></span><span>{% t 'Real router activation is not yet connected. Vouchers here are inventory records, not working internet credentials.' %}</span></div>
+      <div class="integration-notice"><span class="notice-dot"></span><span>{% if omada_paid_pilot_enabled %}Approved Omada pilot: paid guest access is enabled. Router monitoring is separate from payment activation; inventory vouchers are not Omada login codes.{% else %}{% t 'Real router activation is not yet connected. Vouchers here are inventory records, not working internet credentials.' %}{% endif %}</span></div>
       {% block content %}{% endblock %}
       <footer class="footer"><span>© 2026 {{ platform_brand.name|default:'WORLDLINK SECURITY SYSTEMS' }}</span><span>WorldLink Hotspot Cloud · v0.9</span></footer>
     </main>
