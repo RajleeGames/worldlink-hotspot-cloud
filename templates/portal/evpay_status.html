@@ -1,10 +1,11 @@
 {% extends 'portal/base.html' %}{% load translations %}
 {% block guest_content %}
 <div class="guest-narrow">
-  <section class="guest-status-panel">
-    <div class="guest-status-symbol {% if collection.status == 'SETTLED' or collection.status == 'SUCCESS' %}guest-status-success{% endif %}">{% if collection.status == 'SETTLED' or collection.status == 'SUCCESS' %}✓{% else %}···{% endif %}</div>
-    <h1>{% if collection.status == 'SETTLED' or collection.status == 'SUCCESS' %}{{ w.payment_confirmed }}{% elif collection.status == 'FAILED' %}{{ w.payment_failed }}{% elif collection.status == 'REFUNDED' or collection.status == 'REVERSED' %}{{ w.payment_reversed }}{% else %}{{ w.check_phone }}{% endif %}</h1>
-    <p>{% if collection.omada_activated_at %}{{ w.wifi_activated }}{% elif collection.status == 'SETTLED' or collection.status == 'SUCCESS' %}{{ w.payment_verified_pending }}{% elif collection.status == 'FAILED' %}{{ w.payment_failed_note }}{% elif collection.status == 'UNKNOWN' %}{{ w.provider_uncertain }}{% else %}{{ w.approve_prompt }}{% endif %}</p>
+  <section class="guest-status-panel" {% if package_expires_at %}data-guest-expiry data-expiry-at="{{ package_expires_at|date:'c' }}" data-expired-title="{{ w.internet_expired }}" data-expired-note="{{ w.internet_expired_note }}"{% endif %}>
+    <div class="guest-status-symbol {% if package_expired %}guest-status-cancelled{% elif collection.status == 'SETTLED' or collection.status == 'SUCCESS' %}guest-status-success{% endif %}" data-expiry-icon>{% if package_expired %}!{% elif collection.status == 'SETTLED' or collection.status == 'SUCCESS' %}✓{% else %}···{% endif %}</div>
+    <h1 data-expiry-heading>{% if package_expired %}{{ w.internet_expired }}{% elif collection.status == 'SETTLED' or collection.status == 'SUCCESS' %}{{ w.payment_confirmed }}{% elif collection.status == 'FAILED' %}{{ w.payment_failed }}{% elif collection.status == 'REFUNDED' or collection.status == 'REVERSED' %}{{ w.payment_reversed }}{% else %}{{ w.check_phone }}{% endif %}</h1>
+    <p data-expiry-description>{% if package_expired %}{{ w.internet_expired_note }}{% elif collection.omada_activated_at %}{{ w.wifi_activated }}{% elif collection.status == 'SETTLED' or collection.status == 'SUCCESS' %}{{ w.payment_verified_pending }}{% elif collection.status == 'FAILED' %}{{ w.payment_failed_note }}{% elif collection.status == 'UNKNOWN' %}{{ w.provider_uncertain }}{% else %}{{ w.approve_prompt }}{% endif %}</p>
+    {% if package_expires_at %}<p class="guest-countdown" data-expiry-remaining {% if package_expired %}hidden{% endif %}>{{ w.time_remaining }}: <strong data-expiry-clock>—</strong></p>{% endif %}
   </section>
   <section class="guest-receipt">
     <div><span>{{ w.reference }}</span><strong class="guest-mono">{{ collection.reference }}</strong></div>
@@ -13,6 +14,7 @@
     <div><span>{{ w.status }}</span><strong>{% t collection.get_status_display %}</strong></div>
   </section>
   <p class="guest-privacy">{{ w.merchant_payment_start }} {{ company.name }}. {{ w.merchant_payment_end }}</p>
+  {% if package_expires_at %}<a class="guest-primary guest-submit" href="{% url 'portal:public' company.slug %}?lang={{ lang }}" data-expiry-renew {% if not package_expired %}hidden{% endif %}>{{ w.renew_package }}</a>{% endif %}
   <a class="guest-primary guest-submit" href="{% url 'portal:evpay_status' company.slug collection.public_id %}?lang={{ lang }}">{{ w.refresh }}</a>
   {% if not collection.omada_activated_at and collection.status != 'FAILED' and collection.status != 'REFUNDED' and collection.status != 'REVERSED' and collection.status != 'UNKNOWN' %}<script>setTimeout(function(){window.location.reload();}, 8000);</script>{% endif %}
 </div>

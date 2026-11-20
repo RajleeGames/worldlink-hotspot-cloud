@@ -75,14 +75,16 @@ def build_breadcrumbs(request):
         if name=='staff_invite': trail.append(('Invite staff',None))
         if name=='invitation_created': trail.append(('Invitation link',None))
     elif namespace == 'payments':
-        trail.append(('Sales', None))
         if name in ('evpay_lab','evpay_auth','evpay_start','evpay_reconcile'):
+            trail = [('WorldLink Control Center','controlcenter:overview')]
             trail.append(('EvPay test lab', None))
-        elif name in ('methods','method_create','method_edit','method_disable'):
+        else:
+            trail.append(('Sales', None))
+        if name in ('methods','method_create','method_edit','method_disable'):
             trail.append(('Payment methods','payments:methods' if name != 'methods' else None))
             if name == 'method_create': trail.append(('Add method',None))
             if name == 'method_edit': trail.append(('Edit method',None))
-        else:
+        elif name not in ('evpay_lab','evpay_auth','evpay_start','evpay_reconcile'):
             trail.append(('Payment requests','payments:orders' if name != 'orders' else None))
             if name in ('order_detail','verify','cancel'): trail.append(('Request details',None))
     elif namespace == 'wallets':
@@ -134,10 +136,13 @@ def shell_context(request):
     membership=active_membership(request)
     from payments.collections import collection_enabled_for
     resolver=getattr(request,'resolver_match',None)
-    platform_area=bool(resolver and (resolver.namespace == 'controlcenter' or (
-        resolver.namespace == 'wallets' and resolver.url_name in
-        ('queue','destination_review','withdrawal_detail','withdrawal_review','collection_new')
-    )))
+    platform_area=bool(resolver and (
+        resolver.namespace == 'controlcenter'
+        or (resolver.namespace == 'payments' and resolver.url_name in
+            ('evpay_lab','evpay_auth','evpay_start','evpay_reconcile'))
+        or (resolver.namespace == 'wallets' and resolver.url_name in
+            ('queue','destination_review','withdrawal_detail','withdrawal_review','collection_new'))
+    ))
     return {
         'app_css_version':settings.APP_CSS_VERSION,
         'app_js_version':settings.APP_JS_VERSION,
@@ -145,7 +150,7 @@ def shell_context(request):
         'active_membership':membership,
         'breadcrumbs':build_breadcrumbs(request) if request.user.is_authenticated else [],
         'active_company':membership.company if membership else None,
-        'evpay_pilot_available': bool(membership and settings.EVPAY_ENABLED and settings.EVPAY_COMPANY_ID == membership.company_id),
+        'evpay_pilot_available': bool(request.user.is_authenticated and request.user.is_superuser and settings.EVPAY_ENABLED),
         'omada_paid_pilot_enabled': bool(membership and collection_enabled_for(membership.company)),
         'ui_lang':request.session.get('ui_lang','en'),
         'allow_signup':settings.ALLOW_PUBLIC_SIGNUP,

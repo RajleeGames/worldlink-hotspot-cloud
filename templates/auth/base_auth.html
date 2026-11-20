@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ app_css_version }}">
-  <script defer src="{% static 'js/app.js' %}?v=6"></script>
+  <script defer src="{% static 'js/app.js' %}?v={{ app_js_version }}"></script>
 </head>
 <body class="auth-body">
 {% include 'partials/preloader.html' %}

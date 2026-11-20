@@ -171,3 +171,20 @@ class EvPayCollectionDelivery(models.Model):
     event = models.CharField(max_length=40)
     status = models.CharField(max_length=12)
     received_at = models.DateTimeField(auto_now_add=True)
+
+
+class EvPayCompanyAuthorization(models.Model):
+    """WorldLink-only approval for collecting on behalf of one business.
+
+    An explicit row overrides the legacy environment allowlist in either
+    direction; this permits revocation from the web console without a deploy.
+    """
+    company = models.OneToOneField(Company, on_delete=models.PROTECT,
+                                   related_name='evpay_authorization')
+    enabled = models.BooleanField(default=False)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True,
+                                    on_delete=models.SET_NULL)
+    reviewed_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'{self.company} · {"authorized" if self.enabled else "blocked"}'

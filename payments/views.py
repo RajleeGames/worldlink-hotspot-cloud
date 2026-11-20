@@ -1,12 +1,11 @@
 from django.contrib import messages
 from django.db.models import Sum, Count, Q
-from django.http import HttpResponseNotAllowed
+from django.http import HttpResponseNotAllowed, Http404
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from tenants.utils import require_tenant
-from .models import PaymentMethod, PaymentOrder
-from .forms import PaymentMethodForm
+from .models import PaymentOrder
 from .services import update_order_status
 
 
@@ -60,38 +59,20 @@ def cancel_order(request, pk):
 
 @require_tenant('OWNER', 'MANAGER')
 def methods(request):
-    rows = PaymentMethod.objects.filter(company=request.active_company)
-    return render(request, 'payments/methods.html', {'methods': rows, 'page_title': 'Payment methods'})
+    raise Http404('Manual payment setup is retired. Use verified EvPay or sold vouchers.')
 
 
 @require_tenant('OWNER', 'MANAGER')
 def method_create(request):
-    form = PaymentMethodForm(request.POST or None)
-    if request.method == 'POST' and form.is_valid():
-        obj = form.save(commit=False)
-        obj.company = request.active_company
-        obj.save()
-        messages.success(request, 'Manual payment instructions saved. No payment API has been connected.')
-        return redirect('payments:methods')
-    return render(request, 'payments/method_form.html', {'form': form, 'page_title': 'Add payment method'})
+    raise Http404('Manual payment setup is retired.')
 
 
 @require_tenant('OWNER', 'MANAGER')
 def method_edit(request, pk):
-    method = get_object_or_404(PaymentMethod, company=request.active_company, pk=pk)
-    form = PaymentMethodForm(request.POST or None, instance=method)
-    if request.method == 'POST' and form.is_valid():
-        form.save()
-        messages.success(request, 'Payment instructions updated.')
-        return redirect('payments:methods')
-    return render(request, 'payments/method_form.html', {'form': form, 'page_title': 'Edit payment method', 'method': method})
+    raise Http404('Manual payment setup is retired.')
 
 
 @require_tenant('OWNER', 'MANAGER')
 @require_POST
 def method_disable(request, pk):
-    method = get_object_or_404(PaymentMethod, company=request.active_company, pk=pk)
-    method.is_active = False
-    method.save(update_fields=['is_active'])
-    messages.success(request, 'Method hidden from public checkout. Existing requests are preserved.')
-    return redirect('payments:methods')
+    raise Http404('Manual payment setup is retired.')

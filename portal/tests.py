@@ -28,7 +28,7 @@ class PublicPortalTests(TestCase):
         self.assertContains(response, 'One hour')
         self.assertNotContains(response, 'PRIVATE SECOND PLAN')
         self.assertNotContains(response, 'PRIVATE SECOND NETWORK')
-        self.assertEqual(response.context['methods_count'], 1)
+        self.assertNotContains(response, 'Manual payment request')
 
     def test_guest_language_links_translate_portal_without_switching_business(self):
         url = reverse('portal:public', args=[self.a.slug])
@@ -63,16 +63,19 @@ class PublicPortalTests(TestCase):
     def test_checkout_refuses_other_business_payment_method(self):
         url = reverse('portal:checkout', args=[self.a.slug, self.a_plan.pk])
         response = self.client.post(url, {'customer_name':'Guest A', 'customer_phone':'0712345678', 'method':self.b_method.pk})
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 404)
         self.assertEqual(PaymentOrder.objects.count(), 0)
 
-    def test_portal_payment_is_pending_not_router_access(self):
+    def test_legacy_manual_orders_are_preserved_without_public_checkout(self):
+        from payments.services import create_pending_order
         url = reverse('portal:checkout', args=[self.a.slug, self.a_plan.pk])
         response = self.client.post(url, {'customer_name':'Guest A', 'customer_phone':'0712345678', 'method':self.a_method.pk})
-        self.assertEqual(response.status_code, 302)
-        order = PaymentOrder.objects.get()
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(PaymentOrder.objects.count(), 0)
+        order = create_pending_order(company=self.a, plan=self.a_plan, method=self.a_method,
+                                     name='Guest A', phone='0712345678')
         self.assertEqual(order.status, 'PENDING')
-        self.assertEqual(order.customer_phone, '255712345678')
+        self.assertEqual(order.customer_phone, '0712345678')
         self.assertEqual(order.amount, self.a_plan.price)
         self.assertEqual(HotspotSession.objects.count(), 0)
         receipt = self.client.get(reverse('portal:status', args=[self.a.slug, order.public_id]))
@@ -91,3 +94,14 @@ class PublicPortalTests(TestCase):
         self.assertEqual(self.client.get(reverse('portal:settings')).status_code, 403)
         self.client.force_login(owner)
         self.assertEqual(self.client.get(reverse('portal:settings')).status_code, 200)
+
+    def test_business_cannot_reopen_manual_payment_setup_urls(self):
+        owner = User.objects.create_user(username='manual-retired@example.com', password='strongTestPassword!')
+        Membership.objects.create(company=self.a, user=owner, role='OWNER')
+        self.client.force_login(owner)
+        self.assertEqual(self.client.get(reverse('payments:methods')).status_code, 404)
+        self.assertEqual(self.client.get(reverse('payments:method_create')).status_code, 404)
+        self.assertEqual(self.client.post(reverse('payments:method_disable', args=[self.a_method.pk])).status_code, 404)
+        # Existing records remain untouched; they simply cannot create new guest requests.
+        self.a_method.refresh_from_db()
+        self.assertTrue(self.a_method.is_active)

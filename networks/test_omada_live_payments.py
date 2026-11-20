@@ -155,6 +155,40 @@ class MultiBusinessPaymentGateTests(TestCase):
             authorize_paid_collection(payment)
         self.assertFalse(EvPayCollection.objects.get(pk=payment.pk).omada_activated_at)
 
+    def test_worldlink_can_allow_and_revoke_a_new_company_in_browser(self):
+        from payments.models import EvPayCompanyAuthorization
+        OmadaDeviceObservation.objects.create(router=self.router, state='CONNECTED', checked_at=timezone.now())
+        self.enable()
+        url = reverse('controlcenter:router_company_evpay_access', args=[self.profile.pk])
+        self.client.force_login(self.owner)
+        self.assertEqual(self.client.post(url, {'decision': 'enable', 'merchant_permission': 'yes'}).status_code, 403)
+        self.client.force_login(self.staff)
+        with override_settings(EVPAY_COLLECTION_COMPANY_IDS=set()):
+            self.assertFalse(collection_enabled_for(self.company))
+            self.client.post(url, {'decision': 'enable'})
+            self.assertFalse(collection_enabled_for(self.company))
+            self.client.post(url, {'decision': 'enable', 'merchant_permission': 'yes'})
+            self.assertTrue(EvPayCompanyAuthorization.objects.get(company=self.company).enabled)
+            self.assertTrue(collection_enabled_for(self.company))
+        self.client.post(url, {'decision': 'disable'})
+        self.assertFalse(EvPayCompanyAuthorization.objects.get(company=self.company).enabled)
+        # Browser revocation must override even an old .env allowlist.
+        self.assertFalse(collection_enabled_for(self.company))
+
+    def test_staff_can_choose_omada_site_from_read_only_browser_list(self):
+        self.profile.status = 'SUBMITTED'
+        self.profile.save(update_fields=['status'])
+        self.client.force_login(self.staff)
+        with patch('networks.omada_monitor.OmadaReadOnlyClient') as api:
+            api.return_value.visible_sites.return_value = [{'name': 'New shop site', 'siteId': 'new-site-123'}]
+            page = self.client.get(reverse('controlcenter:router_onboarding_detail',
+                                           args=[self.profile.pk]) + '?load_sites=1')
+        self.assertContains(page, 'New shop site')
+        self.assertContains(page, 'new-site-123')
+        self.client.force_login(self.owner)
+        self.assertEqual(self.client.get(reverse('controlcenter:router_onboarding_detail',
+                                              args=[self.profile.pk]) + '?load_sites=1').status_code, 403)
+
     def test_expired_payment_cannot_starve_a_new_authorization(self):
         OmadaDeviceObservation.objects.create(router=self.router, state='CONNECTED',
                                                checked_at=timezone.now())

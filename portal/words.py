@@ -42,6 +42,9 @@ EN = {
     'merchant_payment_end': 'Keep this reference for support.',
     'amount': 'Amount', 'at_counter': 'At business counter',
     'keep_reference': 'Keep this reference for the business staff to reconcile your request.',
+    'internet_expired': 'Your internet package has expired',
+    'internet_expired_note': 'Your paid time has ended. Choose a new package to get online again.',
+    'renew_package': 'Buy internet again', 'time_remaining': 'Time remaining',
 }
 SW = {
     'tagline': 'Wi-Fi rahisi na ya haraka', 'choose': 'Chagua kifurushi cha Wi-Fi',
@@ -87,6 +90,9 @@ SW = {
     'merchant_payment_end': 'Hifadhi namba hii ya kumbukumbu kwa msaada.',
     'amount': 'Kiasi', 'at_counter': 'Kwenye kaunta ya biashara',
     'keep_reference': 'Hifadhi namba hii ya kumbukumbu ili wafanyakazi wa biashara waweze kukagua ombi lako.',
+    'internet_expired': 'Muda wa kifurushi chako cha intaneti umeisha',
+    'internet_expired_note': 'Muda wa kifurushi umekwisha. Chagua kifurushi kingine ili uendelee kutumia intaneti.',
+    'renew_package': 'Nunua kifurushi kingine', 'time_remaining': 'Muda uliobaki',
 }
 
 def words_for(code):

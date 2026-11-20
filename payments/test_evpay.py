@@ -62,9 +62,10 @@ class EvPayLabTests(TestCase):
         User = get_user_model()
         self.owner = User.objects.create_user(username='owner-evpay@example.com', password='StrongPassword123!')
         self.other_owner = User.objects.create_user(username='other-evpay@example.com', password='StrongPassword123!')
+        self.staff = User.objects.create_superuser(username='worldlink-superuser@example.com', password='StrongPassword123!')
         Membership.objects.create(user=self.owner, company=self.company, role='OWNER')
         Membership.objects.create(user=self.other_owner, company=self.other_company, role='OWNER')
-        self.client.force_login(self.owner)
+        self.client.force_login(self.staff)
 
     def _push(self, phone='255712345678', amount=500):
         with patch('payments.evpay_views.initiate_ussd', return_value={'transactionId': 'E123456'}) as post:
@@ -87,10 +88,17 @@ class EvPayLabTests(TestCase):
                                 HTTP_X_EVPAY_DELIVERY=delivery, HTTP_X_EVPAY_EVENT=event,
                                 HTTP_X_EVPAY_SIGNATURE=f't={t},v1={signature}')
 
-    def test_only_approved_business_owner_can_open_lab(self):
+    def test_only_worldlink_superuser_can_open_lab(self):
         self.assertEqual(self.client.get(reverse('payments:evpay_lab')).status_code, 200)
         self.client.force_login(self.other_owner)
-        self.assertEqual(self.client.get(reverse('payments:evpay_lab')).status_code, 404)
+        self.assertEqual(self.client.get(reverse('payments:evpay_lab')).status_code, 403)
+        self.client.force_login(self.owner)
+        self.assertEqual(self.client.get(reverse('payments:evpay_lab')).status_code, 403)
+        self.assertEqual(self.client.post(reverse('payments:evpay_start'), {
+            'operator': 'Mpesa', 'phone': '0712345678', 'amount': 500,
+            'authorized': 'on',
+        }).status_code, 403)
+        self.assertEqual(EvPayTestPayment.objects.count(), 0)
 
     def test_initiate_is_pending_not_paid(self):
         obj = self._push()

@@ -14,6 +14,7 @@ from django.views.decorators.http import require_POST
 from tenants.models import Company, Membership
 from networks.forms import OmadaCentralAssignmentForm
 from networks.models import OmadaDeviceObservation, OmadaManagedSite, OmadaOnboarding, Router, WifiPlan
+from payments.collections import company_collection_allowed
 from vouchers.models import Voucher, ManualSale, VoucherRedemption
 from hotspots.models import HotspotSession, HotspotCustomer
 from .auth import platform_required, platform_can_manage
@@ -74,6 +75,20 @@ def router_onboarding_detail(request, pk):
     observation = OmadaDeviceObservation.objects.filter(router_id=profile.router_id).first()
     connected = bool(observation and observation.state == OmadaDeviceObservation.State.CONNECTED
                      and observation.is_fresh)
+    visible_omada_sites = []
+    omada_sites_error = ''
+    if (profile.status == OmadaOnboarding.Status.SUBMITTED
+            and platform_can_manage(request.user) and request.GET.get('load_sites') == '1'):
+        from networks.omada_monitor import OmadaReadOnlyClient, OmadaMonitorError
+        try:
+            for site in OmadaReadOnlyClient().visible_sites():
+                site_id = site.get('siteId', site.get('id', ''))
+                name = site.get('name', site.get('siteName', 'Unnamed site'))
+                if isinstance(site_id, str) and 1 <= len(site_id) <= 80 and all(
+                        letter.isascii() and (letter.isalnum() or letter in '_-') for letter in site_id):
+                    visible_omada_sites.append({'id': site_id, 'name': str(name)[:120]})
+        except OmadaMonitorError:
+            omada_sites_error = 'Omada site list could not be loaded. Check central controller access.'
     response = render(request, 'controlcenter/router_onboarding_detail.html', {
         'page_title': f'Router review · {profile.router.name}', 'profile': profile,
         'observation': observation, 'connected': connected,
@@ -83,7 +98,8 @@ def router_onboarding_detail(request, pk):
                            and profile.connection_mode == OmadaOnboarding.ConnectionMode.CENTRAL
                            and profile.managed_site_id is not None,
         'multitenant_flag': settings.EVPAY_MULTITENANT_ENABLED,
-        'company_allowlisted': profile.router.company_id in settings.EVPAY_COLLECTION_COMPANY_IDS,
+        'company_allowlisted': company_collection_allowed(profile.router.company_id),
+        'visible_omada_sites': visible_omada_sites, 'omada_sites_error': omada_sites_error,
     })
     response['Referrer-Policy'] = 'same-origin'
     response['Cache-Control'] = 'private, no-store'
@@ -252,6 +268,37 @@ def router_live_payments(request, pk):
                                  action='OMADA_LIVE_PAYMENT_GATE',
                                  note=f'Router #{profile.router_id}; request #{pk}; decision {decision}.')
     messages.success(request, message)
+    return redirect('controlcenter:router_onboarding_detail', pk=pk)
+
+
+@platform_required(manage=True)
+@require_POST
+@transaction.atomic
+def router_company_evpay_access(request, pk):
+    """WorldLink merchant authorization; explicit decisions override old .env IDs."""
+    from payments.models import EvPayCompanyAuthorization
+    profile = get_object_or_404(OmadaOnboarding.objects.select_related('router__company'),
+                                pk=pk, router__family=Router.Family.OMADA)
+    company = Company.objects.select_for_update().get(pk=profile.router.company_id)
+    decision = request.POST.get('decision')
+    if decision not in ('enable', 'disable'):
+        messages.error(request, 'Unknown merchant approval decision.')
+        return redirect('controlcenter:router_onboarding_detail', pk=pk)
+    if decision == 'enable':
+        if not (company.status == Company.Status.ACTIVE
+                and profile.live_payments_approved_at and profile.live_payments_approved_by_id):
+            messages.error(request, 'Approve the connected router and activate the business first.')
+            return redirect('controlcenter:router_onboarding_detail', pk=pk)
+        if request.POST.get('merchant_permission') != 'yes':
+            messages.error(request, 'Confirm the WorldLink–EvPay agreement covers this business.')
+            return redirect('controlcenter:router_onboarding_detail', pk=pk)
+    EvPayCompanyAuthorization.objects.update_or_create(company=company, defaults={
+        'enabled': decision == 'enable', 'reviewed_by': request.user,
+    })
+    PlatformAudit.objects.create(actor=request.user, company=company,
+        action='EVPAY_COMPANY_AUTHORIZATION',
+        note=f'Business #{company.pk}; router request #{pk}; decision {decision}.')
+    messages.success(request, 'Business EvPay access ' + ('approved.' if decision == 'enable' else 'revoked.'))
     return redirect('controlcenter:router_onboarding_detail', pk=pk)
 
 

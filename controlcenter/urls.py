@@ -7,6 +7,7 @@ urlpatterns = [
     path('router-onboarding/<int:pk>/', views.router_onboarding_detail, name='router_onboarding_detail'),
     path('router-onboarding/<int:pk>/review/', views.review_router_onboarding, name='review_router_onboarding'),
     path('router-onboarding/<int:pk>/live-payments/', views.router_live_payments, name='router_live_payments'),
+    path('router-onboarding/<int:pk>/company-evpay/', views.router_company_evpay_access, name='router_company_evpay_access'),
     path('router-onboarding/<int:pk>/voucher-access/', views.router_voucher_access, name='router_voucher_access'),
     path('router-onboarding/<int:pk>/retire/', views.router_retire, name='router_retire'),
     path('businesses/new/', views.business_create, name='business_create'),

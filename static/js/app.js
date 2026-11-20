@@ -247,12 +247,37 @@
     }));
   }
 
-  document.querySelectorAll('[data-password-toggle]').forEach(button => button.addEventListener('click', () => {
-    const field = button.parentElement.querySelector('input');
-    if (!field) return;
-    field.type = field.type === 'password' ? 'text' : 'password';
-    button.textContent = field.type === 'text' ? (root.lang === 'sw' ? 'Ficha' : 'Hide') : (root.lang === 'sw' ? 'Onyesha' : 'Show');
-  }));
+  // One accessible eye control on every app password field, including forms
+  // rendered by Django (login, registration, invitations and router access).
+  const eyeSvg = `<svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.7-7 10-7 10 7 10 7-3.7 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+  const eyeOffSvg = `<svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 18 18M10.6 5.1c.5-.1.9-.1 1.4-.1 6.3 0 10 7 10 7a17 17 0 0 1-3.2 3.9M6.5 6.5C3.6 8.5 2 12 2 12s3.7 7 10 7c1.6 0 3-.4 4.2-1"/><path d="M10 10a3 3 0 0 0 4 4"/></svg>`;
+  document.querySelectorAll('input[type="password"]').forEach(field => {
+    if (field.closest('.password-visibility') || field.disabled) return;
+    const wrap = document.createElement('span');
+    wrap.className = 'password-visibility';
+    field.parentNode.insertBefore(wrap, field);
+    wrap.appendChild(field);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'password-visibility-button';
+    button.setAttribute('aria-pressed', 'false');
+    const label = () => field.type === 'password'
+      ? (root.lang === 'sw' ? 'Onyesha nenosiri' : 'Show password')
+      : (root.lang === 'sw' ? 'Ficha nenosiri' : 'Hide password');
+    const sync = () => {
+      const visible = field.type === 'text';
+      button.innerHTML = visible ? eyeOffSvg : eyeSvg;
+      button.setAttribute('aria-label', label());
+      button.setAttribute('title', label());
+      button.setAttribute('aria-pressed', String(visible));
+    };
+    button.addEventListener('click', () => {
+      field.type = field.type === 'password' ? 'text' : 'password';
+      sync();
+    });
+    wrap.appendChild(button);
+    sync();
+  });
   document.querySelectorAll('[data-dismiss]').forEach(button => button.addEventListener('click', () => button.closest('.flash')?.remove()));
   document.querySelectorAll('[data-confirm]').forEach(button => button.addEventListener('click', event => {
     if (!window.confirm(button.dataset.confirm)) event.preventDefault();

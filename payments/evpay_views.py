@@ -6,6 +6,8 @@ import hashlib
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.core.cache import cache
 from django.db import IntegrityError
 from django.http import Http404, HttpResponseBadRequest, JsonResponse
@@ -13,7 +15,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from tenants.utils import require_tenant
+from tenants.models import Company
 from .evpay import EvPayError, access_token, initiate_ussd, retrieve_ussd, pilot_enabled_for, verify_webhook, normalize_msisdn
 from .evpay_lab import new_test, apply_status, EVENT_STATUSES
 from .forms import EvPayTestForm
@@ -21,15 +23,19 @@ from .models import EvPayTestPayment
 
 
 def _ensure_pilot(request):
-    if not pilot_enabled_for(request.active_company):
-        raise Http404('EvPay pilot is not enabled for this business.')
+    if not request.user.is_superuser:
+        raise PermissionDenied('WorldLink superuser access is required.')
+    company = Company.objects.filter(pk=settings.EVPAY_COMPANY_ID).first()
+    if company is None or not pilot_enabled_for(company):
+        raise Http404('EvPay test ledger is disabled.')
+    return company
 
 
-@require_tenant('OWNER', 'MANAGER')
+@login_required(login_url='/login/?portal=staff')
 def lab(request):
-    _ensure_pilot(request)
+    company = _ensure_pilot(request)
     form = EvPayTestForm()
-    qs = EvPayTestPayment.objects.filter(company=request.active_company).select_related('created_by')[:50]
+    qs = EvPayTestPayment.objects.filter(company=company).select_related('created_by')[:50]
     return render(request, 'payments/evpay_lab.html', {
         'form': form, 'tests': qs, 'environment': settings.EVPAY_ENVIRONMENT,
         'live_locked': settings.EVPAY_ENVIRONMENT != 'sandbox' and not settings.EVPAY_PRODUCTION_CHARGES_ENABLED,
@@ -37,7 +43,7 @@ def lab(request):
     })
 
 
-@require_tenant('OWNER', 'MANAGER')
+@login_required(login_url='/login/?portal=staff')
 @require_POST
 def test_auth(request):
     _ensure_pilot(request)
@@ -50,10 +56,10 @@ def test_auth(request):
     return redirect('payments:evpay_lab')
 
 
-@require_tenant('OWNER', 'MANAGER')
+@login_required(login_url='/login/?portal=staff')
 @require_POST
 def create_test(request):
-    _ensure_pilot(request)
+    company = _ensure_pilot(request)
     form = EvPayTestForm(request.POST)
     if not form.is_valid():
         messages.error(request, 'Invalid test request. Use an amount of at least TZS 100 and a valid TZ phone.')
@@ -65,11 +71,11 @@ def create_test(request):
             # Short-lived, server-side protection from double-clicking a REAL debit.
             # Production must use a shared Redis cache across all Django workers.
             key = 'evpay-live-click-' + hashlib.sha256(
-                f'{request.active_company.pk}:{request.user.pk}:{phone}'.encode('ascii')).hexdigest()
+                f'{company.pk}:{request.user.pk}:{phone}'.encode('ascii')).hexdigest()
             if not cache.add(key, 1, timeout=45):
                 messages.error(request, 'A live request was just submitted to this phone. Check its status before trying again.')
                 return redirect('payments:evpay_lab')
-        test = new_test(company=request.active_company, user=request.user, operator=data['operator'],
+        test = new_test(company=company, user=request.user, operator=data['operator'],
                         phone=phone, amount=data['amount'])
         try:
             reply = initiate_ussd(test)
@@ -86,11 +92,11 @@ def create_test(request):
     return redirect('payments:evpay_lab')
 
 
-@require_tenant('OWNER', 'MANAGER')
+@login_required(login_url='/login/?portal=staff')
 @require_POST
 def reconcile_test(request, pk):
-    _ensure_pilot(request)
-    obj = get_object_or_404(EvPayTestPayment, company=request.active_company, pk=pk)
+    company = _ensure_pilot(request)
+    obj = get_object_or_404(EvPayTestPayment, company=company, pk=pk)
     if obj.environment != settings.EVPAY_ENVIRONMENT:
         messages.error(request, 'Cannot reconcile a payment from a different environment.')
         return redirect('payments:evpay_lab')

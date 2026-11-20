@@ -37,6 +37,16 @@
         <div><dt>{% t 'Customer inform URL' %}</dt><dd class="mono">{{ profile.managed_site.inform_url|default:'Configure central inform hostname' }}</dd></div>
       </dl>{% else %}<div class="onboard-empty">{% t 'No central site assigned yet. Create a separate business site in Omada before reviewing the setup.' %}</div>{% endif %}
       {% if profile.status == 'SUBMITTED' and can_manage_platform %}
+      <div class="onboard-action-form">
+        <a class="button button-secondary" href="{% url 'controlcenter:router_onboarding_detail' profile.pk %}?load_sites=1">{% t 'Load Omada site list' %}</a>
+        {% if omada_sites_error %}<p class="field-hint">{{ omada_sites_error }}</p>{% endif %}
+        {% if visible_omada_sites %}<label class="guest-label" for="omada-site-picker">{% t 'Select the new business site' %}</label>
+        <select class="input" id="omada-site-picker" onchange="var picked=this.options[this.selectedIndex];if(!picked.value)return;document.getElementById('site-name').value=picked.getAttribute('data-site-name');document.getElementById('site-api').value=picked.value;">
+          <option value="">{% t 'Choose an Omada site' %}</option>
+          {% for site in visible_omada_sites %}<option value="{{ site.id }}" data-site-name="{{ site.name }}">{{ site.name }} · {{ site.id }}</option>{% endfor %}
+        </select>
+        <p class="field-hint">{% t 'The site name and Open API ID fill automatically. Copy the separate Inform ID from the Omada site settings.' %}</p>{% endif %}
+      </div>
       <form method="post" action="{% url 'controlcenter:review_router_onboarding' profile.pk %}" class="onboard-form">{% csrf_token %}<input type="hidden" name="review_page" value="1">
         <div class="field"><label for="site-name">{% t 'Central Omada site name' %}</label><input class="input" id="site-name" name="site_name" maxlength="120" placeholder="{% t 'Business · Main Site' %}" autocomplete="off"></div>
         <div class="field"><label for="site-inform">Site Inform ID (omadacId)</label><input class="input mono" id="site-inform" name="inform_site_id" maxlength="80" placeholder="{% t 'Copy from Omada device Inform URL' %}" autocomplete="off"></div>
@@ -83,6 +93,23 @@
         <button type="submit" name="decision" value="enable" class="button button-primary" {% if not can_enable_live %}disabled{% endif %}>{% t 'Approve this AP for live payments' %}</button>
         {% if not can_enable_live %}<small class="field-hint">{% t 'Requires an active company, approved central site, and fresh connected AP observation.' %}</small>{% endif %}
       </form>{% else %}<div class="onboard-help">{% t 'Only authorized WorldLink staff can enable live payments.' %}</div>{% endif %}
+      {% if can_manage_platform %}
+      <div class="onboard-action-form" style="margin-top:16px;border-top:1px solid #e4edf2;padding-top:16px">
+        <h3>{% t 'WorldLink merchant approval' %}</h3>
+        <p class="field-hint">{% t 'Approve this business once in WorldLink Admin. No new VPS company ID or secret is required. Every router still needs its own approval.' %}</p>
+        {% if company_allowlisted %}
+        <form method="post" action="{% url 'controlcenter:router_company_evpay_access' profile.pk %}">{% csrf_token %}
+          <button class="button button-secondary" type="submit" name="decision" value="disable">{% t 'Stop EvPay checkout for this business' %}</button>
+        </form>
+        {% else %}
+        <form method="post" action="{% url 'controlcenter:router_company_evpay_access' profile.pk %}">{% csrf_token %}
+          <label class="onboard-check"><input type="checkbox" name="merchant_permission" value="yes" required> {% t 'WorldLink has written EvPay permission to collect for this business.' %}</label>
+          <button class="button button-primary" type="submit" name="decision" value="enable" {% if not profile.live_payments_approved_at %}disabled{% endif %}>{% t 'Approve business EvPay checkout' %}</button>
+        </form>
+        {% endif %}
+        {% if not multitenant_flag %}<p class="field-hint">{% t 'Global multi-business rollout is disabled. WorldLink must enable it once on the server before web approvals take effect.' %}</p>{% endif %}
+      </div>
+      {% endif %}
     </section>
     {% if can_manage_platform and profile.status == 'REVIEWED' %}
     <section class="panel"><div class="panel-heading"><div><h2>{% t 'Transfer this physical AP' %}</h2><p>{% t 'One EAP can serve only one approved tenant at a time. Preserve historical sales and stop new sales before changing its site.' %}</p></div></div>

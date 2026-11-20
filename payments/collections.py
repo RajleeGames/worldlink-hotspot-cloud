@@ -30,7 +30,7 @@ def live_central_routes(company_id):
     """
     from networks.models import OmadaOnboarding
     if (not settings.EVPAY_MULTITENANT_ENABLED or not settings.OMADA_LIVE_ENABLED
-            or company_id not in settings.EVPAY_COLLECTION_COMPANY_IDS):
+            or not company_collection_allowed(company_id)):
         return OmadaOnboarding.objects.none()
     return OmadaOnboarding.objects.filter(
         router__company_id=company_id, router__family='OMADA',
@@ -39,6 +39,20 @@ def live_central_routes(company_id):
         managed_site__company_id=company_id, managed_site__openapi_site_id__gt='',
         live_payments_approved_at__isnull=False, live_payments_approved_by__isnull=False,
     )
+
+
+def company_collection_allowed(company_id):
+    """An audited web decision overrides old .env IDs; no company ID edits needed.
+
+    The old setting remains a migration-compatible fallback for companies not
+    yet reviewed in the console. It is never a replacement for router approval.
+    """
+    from .models import EvPayCompanyAuthorization
+    choice = EvPayCompanyAuthorization.objects.filter(company_id=company_id).values_list(
+        'enabled', flat=True).first()
+    if choice is not None:
+        return bool(choice)
+    return company_id in settings.EVPAY_COLLECTION_COMPANY_IDS
 
 
 def approved_payment_route(company_id, ap_mac, ssid):
@@ -62,7 +76,7 @@ def approved_payment_route(company_id, ap_mac, ssid):
 
 def collection_enabled_for(company):
     ready = bool(settings.EVPAY_ENABLED and settings.EVPAY_PUBLIC_CHECKOUT_ENABLED
-        and company.pk in settings.EVPAY_COLLECTION_COMPANY_IDS
+        and company_collection_allowed(company.pk)
         and settings.OMADA_LIVE_ENABLED
         and all((settings.OMADA_CONTROLLER_URL, settings.OMADA_CONTROLLER_ID,
                  settings.OMADA_OPERATOR_NAME, settings.OMADA_OPERATOR_PASSWORD))

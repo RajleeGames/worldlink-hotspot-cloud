@@ -1,5 +1,6 @@
 import hashlib
 import uuid
+from datetime import timedelta
 
 from django.contrib import messages
 from django.conf import settings as django_settings
@@ -12,9 +13,8 @@ from django.utils import timezone
 from tenants.models import Company
 from tenants.utils import require_tenant
 from networks.models import WifiPlan
-from payments.models import PaymentMethod, PaymentOrder, EvPayCollection
-from payments.forms import PublicOrderForm, PublicEvPayForm
-from payments.services import create_pending_order
+from payments.models import PaymentOrder, EvPayCollection
+from payments.forms import PublicEvPayForm
 from payments.collections import collection_enabled_for
 from payments.evpay import EvPayError, initiate_collection
 from payments.collections import start_collection
@@ -42,6 +42,28 @@ def _context(company, portal, lang):
     return {'company': company, 'portal': portal, 'lang': lang, 'w': words_for(lang), 'public_portal': True}
 
 
+def _recent_package_expired(company, client):
+    """Inform the returning *same captive client* without exposing purchase data.
+
+    The trusted device/AP/SSID route is checked before its context is stored.
+    A public visit without a recent Omada context never reveals account state.
+    """
+    if not client:
+        return False
+    paid = EvPayCollection.objects.filter(
+        company=company, client_mac=client['clientMac'], ap_mac=client['apMac'],
+        ssid_name=client['ssidName'], omada_activated_at__isnull=False,
+        confirmed_at__isnull=False, status__in=['SUCCESS', 'SETTLED'],
+    ).select_related('plan').order_by('-confirmed_at')[:10]
+    redeemed = VoucherRedemption.objects.filter(
+        company=company, client_mac=client['clientMac'], ap_mac=client['apMac'],
+        ssid_name=client['ssidName'], activated_at__isnull=False,
+    ).order_by('-claimed_at')[:10]
+    end_times = [p.confirmed_at + timedelta(minutes=p.plan.duration_minutes) for p in paid]
+    end_times += [r.expires_at for r in redeemed]
+    return bool(end_times and max(end_times) <= timezone.now())
+
+
 @require_tenant('OWNER', 'MANAGER')
 def settings(request):
     portal, _ = CaptivePortal.objects.get_or_create(company=request.active_company)
@@ -63,14 +85,14 @@ def public(request, slug):
     controller_context(request, company)
     lang = _locale(request)
     plans = WifiPlan.objects.filter(company=company, is_active=True).order_by('price', 'id')
-    methods = PaymentMethod.objects.filter(company=company, is_active=True).count()
     omada = recent_controller_context(request, company)
     response = render(request, 'portal/public.html', {
-        **_context(company, portal, lang), 'plans': plans, 'methods_count': methods,
+        **_context(company, portal, lang), 'plans': plans,
         'evpay_available': collection_enabled_for(company)
         and bool(omada),
         'voucher_available': bool(omada and approved_voucher_route(
             company, omada.get('apMac'), omada.get('ssidName'))),
+        'previous_package_expired': _recent_package_expired(company, omada),
     })
     response['Cache-Control'] = 'private, no-store'
     response['Referrer-Policy'] = 'same-origin'
@@ -122,6 +144,7 @@ def voucher_status(request, slug, public_id):
         raise Http404('Reopen this page from your Wi-Fi login session.')
     response = render(request, 'portal/voucher_result.html', {
         **_context(company, portal, _locale(request)), 'redemption': redemption,
+        'package_expired': timezone.now() >= redemption.expires_at,
     })
     response['Cache-Control'] = 'private, no-store'
     response['Referrer-Policy'] = 'no-referrer'
@@ -130,28 +153,7 @@ def voucher_status(request, slug, public_id):
 
 @require_http_methods(['GET', 'POST'])
 def checkout(request, slug, plan_id):
-    company, portal = _business(slug)
-    lang = _locale(request)
-    plan = get_object_or_404(WifiPlan, company=company, id=plan_id, is_active=True)
-    methods = PaymentMethod.objects.filter(company=company, is_active=True).order_by('channel', 'id')
-    form = PublicOrderForm(request.POST or None, company=company)
-    if request.method == 'POST' and form.is_valid():
-        # Session throttling is a basic anti-accidental-repeat measure, not a production rate limit.
-        # Redis-backed IP/phone throttling and abuse monitoring are required before public launch.
-        recent = request.session.get('whc_last_checkout_at', 0)
-        if timezone.now().timestamp() - recent < 8:
-            form.add_error(None, 'Please wait a moment before making another request.')
-        else:
-            order = create_pending_order(
-                company=company, plan=plan, method=form.cleaned_data['method'],
-                name=form.cleaned_data['customer_name'], phone=form.cleaned_data['customer_phone'],
-            )
-            request.session['whc_last_checkout_at'] = timezone.now().timestamp()
-            url = reverse('portal:status', kwargs={'slug': slug, 'public_id': order.public_id})
-            return redirect(f'{url}?lang={lang}')
-    return render(request, 'portal/checkout.html', {
-        **_context(company, portal, lang), 'plan': plan, 'methods': methods, 'form': form,
-    })
+    raise Http404('Manual payment requests are retired; use EvPay or vouchers.')
 
 
 @require_http_methods(['GET'])
@@ -217,8 +219,13 @@ def evpay_status(request, slug, public_id):
     company, portal = _business(slug)
     collection = get_object_or_404(EvPayCollection.objects.select_related('plan'),
                                    company=company, public_id=public_id)
+    package_expires_at = (collection.confirmed_at + timedelta(minutes=collection.plan.duration_minutes)
+                          if collection.status in ('SUCCESS', 'SETTLED')
+                          and collection.confirmed_at and collection.omada_activated_at else None)
     response = render(request, 'portal/evpay_status.html', {
         **_context(company, portal, _locale(request)), 'collection': collection,
+        'package_expires_at': package_expires_at,
+        'package_expired': bool(package_expires_at and timezone.now() >= package_expires_at),
     })
     response['Cache-Control'] = 'private, no-store'
     response['Referrer-Policy'] = 'no-referrer'

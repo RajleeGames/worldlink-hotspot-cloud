@@ -2,7 +2,7 @@
 {% block content %}
 <div class="page-heading">
  <div><p class="eyebrow">{% t 'Payments · Provider testing' %}</p><h1>{% t 'EvPay test lab' %}</h1><p>{% t 'Test authentication, mobile-money requests, verified callbacks and reconciliation — without router authorization.' %}</p></div>
- <div class="heading-actions"><a href="{% url 'payments:orders' %}" class="button button-secondary">{% t 'Payment requests' %}</a><a href="{% url 'payments:methods' %}" class="button button-secondary">{% t 'Merchant methods' %}</a></div>
+ <div class="heading-actions"><a href="{% url 'controlcenter:overview' %}" class="button button-secondary">{% t 'WorldLink Control Center' %}</a></div>
 </div>
 <div class="evpay-state-bar"><span class="evpay-led"></span><span>{% t 'Merchant environment:' %} <strong>{{ environment|upper }}</strong></span><span class="evpay-state-divider"></span><span>{% t 'Isolated test ledger — no Wi-Fi credentials issued' %}</span></div>
 <div class="evpay-grid">

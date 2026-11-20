@@ -62,6 +62,9 @@ class ReadOnlyMultiSiteOmada:
             body = {'errorCode': 0, 'result': {'data': [
                 {'mac': 'AA-BB-CC-44-55-66', 'status': self.second_status},
             ]}}
+        elif path.endswith('/clients'):
+            assert request.get_method() == 'GET'
+            body = {'errorCode': 0, 'result': {'data': [], 'totalRows': 0}}
         else:
             raise AssertionError('Unknown Omada endpoint ' + path)
         return io.BytesIO(json.dumps(body).encode())
@@ -116,7 +119,7 @@ class CentralOmadaBusinessTests(TestCase):
         url = reverse('networks:omada_onboarding', args=[self.ap_a.pk])
         page = self.client.get(url)
         self.assertContains(page, 'Connect to WorldLink central Omada')
-        self.assertContains(page, 'No VPN')
+        self.assertContains(page, 'No router passwords or payment API keys are needed here.')
         self.assertEqual(page.headers['Referrer-Policy'], 'same-origin')
         self.assertContains(self.client.post(url, self.details('',)), 'Required to connect this AP')
         self.assertContains(self.client.post(url, self.details('AA:BB:CC:11:22:33') | {'ssid_name': ''}),

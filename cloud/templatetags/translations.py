@@ -943,6 +943,20 @@ SW.update({
     'No verified EvPay customer payments yet.':'Bado hakuna malipo ya wateja yaliyothibitishwa na EvPay.',
     'Upload a photo or logo. We resize it automatically.':'Weka picha au nembo. Tutaipunguza kiotomatiki.',
     'up to 15 MB':'hadi MB 15',
+    'Live Wi-Fi payments':'Malipo ya Wi-Fi ya moja kwa moja',
+    'WorldLink merchant approval':'Idhini ya malipo ya WorldLink',
+    'Approve this business once in WorldLink Admin. No new VPS company ID or secret is required. Every router still needs its own approval.':
+        'Idhinisha biashara hii mara moja kwenye usimamizi wa WorldLink. Hutahitaji kuongeza ID au siri kwenye seva. Kila ruta itahitaji idhini yake.',
+    'Stop EvPay checkout for this business':'Simamisha malipo ya EvPay kwa biashara hii',
+    'WorldLink has written EvPay permission to collect for this business.':'WorldLink ina ruhusa ya maandishi kutoka EvPay kupokea malipo kwa biashara hii.',
+    'Approve business EvPay checkout':'Idhinisha malipo ya EvPay ya biashara',
+    'Global multi-business rollout is disabled. WorldLink must enable it once on the server before web approvals take effect.':
+        'Huduma ya biashara nyingi haijawashwa. WorldLink itaiwasha mara moja kwenye seva kabla ya idhini ya mtandaoni kufanya kazi.',
+    'Load Omada site list':'Pakua orodha ya maeneo ya Omada',
+    'Select the new business site':'Chagua eneo la biashara mpya',
+    'Choose an Omada site':'Chagua eneo la Omada',
+    'The site name and Open API ID fill automatically. Copy the separate Inform ID from the Omada site settings.':
+        'Jina la eneo na ID ya Open API vitajazwa moja kwa moja. Nakili Inform ID kutoka mipangilio ya eneo la Omada.',
 })
 
 @register.simple_tag(takes_context=True)

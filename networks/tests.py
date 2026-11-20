@@ -323,7 +323,7 @@ class OmadaOnboardingTests(TestCase):
         response = self.client.get(dashboard_url)
         self.assertContains(response, 'Awaiting WorldLink review')
         self.assertContains(response, 'testControllerId0123456789abcdefgh')
-        self.assertContains(response, '1 Omada access points registered')
+        self.assertContains(response, '1 registered')
         self.assertContains(response, '1 awaiting review')
 
     def test_tenant_isolation_viewer_denial_and_mikrotik_exclusion(self):

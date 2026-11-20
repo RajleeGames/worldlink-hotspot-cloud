@@ -21,7 +21,7 @@
   <input type="hidden" name="portal" value="{{ portal }}">
   <label for="id_username">{% t 'Email address' %}</label>{{ form.username }}
   <label for="id_password">{% t 'Password' %}</label>
-  <div class="password-wrap">{{ form.password }}<button type="button" class="show-password" data-password-toggle>{% t 'Show' %}</button></div>
+  {{ form.password }}
   <button class="button button-primary button-full login-submit" type="submit">{% t 'Sign in' %}<svg class="icon" aria-hidden="true"><use href="#ico-arrow"></use></svg></button>
 </form>
 {% if portal != 'staff' and allow_signup %}<p class="auth-links">{% t 'New to WorldLink?' %} <a href="{% url 'register' %}">{% t 'Create an account' %}</a></p>{% endif %}

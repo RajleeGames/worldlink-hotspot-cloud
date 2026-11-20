@@ -1,14 +1,15 @@
 {% extends 'portal/base.html' %}
 {% block guest_content %}
 <div class="guest-narrow">
-  <section class="guest-status-panel">
+  <section class="guest-status-panel" {% if redemption %}data-guest-expiry data-expiry-at="{{ redemption.expires_at|date:'c' }}" data-expired-title="{{ w.internet_expired }}" data-expired-note="{{ w.internet_expired_note }}"{% endif %}>
     {% if error %}
     <div class="guest-status-symbol">!</div>
     <h1>{{ w.voucher_problem }}</h1><p role="alert">{{ error }}</p>
     {% else %}
-    <div class="guest-status-symbol guest-status-success">✓</div>
-    <h1>{{ w.voucher_connected }}</h1>
-    <p>{{ w.voucher_success_note }}</p>
+    <div class="guest-status-symbol {% if package_expired %}guest-status-cancelled{% else %}guest-status-success{% endif %}" data-expiry-icon>{% if package_expired %}!{% else %}✓{% endif %}</div>
+    <h1 data-expiry-heading>{% if package_expired %}{{ w.internet_expired }}{% else %}{{ w.voucher_connected }}{% endif %}</h1>
+    <p data-expiry-description>{% if package_expired %}{{ w.internet_expired_note }}{% else %}{{ w.voucher_success_note }}{% endif %}</p>
+    <p class="guest-countdown" data-expiry-remaining {% if package_expired %}hidden{% endif %}>{{ w.time_remaining }}: <strong data-expiry-clock>—</strong></p>
     {% endif %}
   </section>
   {% if redemption %}
@@ -20,6 +21,7 @@
   </section>
   <p class="guest-privacy">{{ w.voucher_money_note }}</p>
   {% endif %}
+  {% if redemption %}<a class="guest-primary guest-submit" data-expiry-renew href="{% url 'portal:public' company.slug %}?lang={{ lang }}" {% if not package_expired %}hidden{% endif %}>{{ w.renew_package }}</a>{% endif %}
   <a class="guest-primary guest-submit" href="{% url 'portal:public' company.slug %}?lang={{ lang }}">{{ w.back }}</a>
 </div>
 {% endblock %}
