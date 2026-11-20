@@ -1,0 +1,25 @@
+{% extends 'portal/base.html' %}
+{% block guest_content %}
+<div class="guest-narrow">
+  <section class="guest-status-panel">
+    {% if error %}
+    <div class="guest-status-symbol">!</div>
+    <h1>{{ w.voucher_problem }}</h1><p role="alert">{{ error }}</p>
+    {% else %}
+    <div class="guest-status-symbol guest-status-success">✓</div>
+    <h1>{{ w.voucher_connected }}</h1>
+    <p>{{ w.voucher_success_note }}</p>
+    {% endif %}
+  </section>
+  {% if redemption %}
+  <section class="guest-receipt">
+    <div><span>{{ w.package }}</span><strong>{{ redemption.voucher.batch.plan.name }}</strong></div>
+    <div><span>{{ w.voucher_used }}</span><strong>{{ redemption.claimed_at|date:'d M Y H:i' }}</strong></div>
+    <div><span>{{ w.voucher_expires }}</span><strong>{{ redemption.expires_at|date:'d M Y H:i' }}</strong></div>
+    <div><span>{{ w.devices }}</span><strong>1</strong></div>
+  </section>
+  <p class="guest-privacy">{{ w.voucher_money_note }}</p>
+  {% endif %}
+  <a class="guest-primary guest-submit" href="{% url 'portal:public' company.slug %}?lang={{ lang }}">{{ w.back }}</a>
+</div>
+{% endblock %}

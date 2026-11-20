@@ -18,7 +18,7 @@ from .models import Expense
 from tenants.models import Company,Membership
 from tenants.utils import require_tenant,active_membership
 from networks.models import OmadaDeviceObservation, OmadaOnboarding, Router, WifiPlan,Location
-from vouchers.models import Voucher,ManualSale,VoucherBatch
+from vouchers.models import Voucher,ManualSale,VoucherBatch,VoucherRedemption
 from hotspots.models import HotspotCustomer, HotspotSession
 from payments.models import EvPayCollection
 from payments.collections import EARNING_STATUSES
@@ -119,6 +119,9 @@ def dashboard(request):
         'vouchers_count':Voucher.objects.filter(company=company).count(),
         'ready_count':Voucher.objects.filter(company=company,status=Voucher.Status.READY).count(),
         'sold_count':Voucher.objects.filter(company=company,status=Voucher.Status.SOLD).count(),
+        'voucher_activated_count':VoucherRedemption.objects.filter(company=company,activated_at__isnull=False).count(),
+        'voucher_active_now_count':VoucherRedemption.objects.filter(company=company,
+            activated_at__isnull=False,expires_at__gt=timezone.now()).count(),
         'total_sales':ManualSale.objects.filter(company=company).aggregate(total=Sum('amount'))['total'] or 0,
         'evpay_confirmed_total':verified_payments.aggregate(total=Sum('amount'))['total'] or 0,
         'evpay_confirmed_count':verified_payments.count(),

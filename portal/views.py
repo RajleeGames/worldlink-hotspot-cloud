@@ -19,6 +19,8 @@ from payments.collections import collection_enabled_for
 from payments.evpay import EvPayError, initiate_collection
 from payments.collections import start_collection
 from payments.omada import controller_context, recent_controller_context
+from vouchers.models import VoucherRedemption
+from vouchers.services import VoucherError, approved_voucher_route, redeem_voucher
 from .models import CaptivePortal
 from .forms import CaptivePortalForm
 from .words import words_for
@@ -62,11 +64,67 @@ def public(request, slug):
     lang = _locale(request)
     plans = WifiPlan.objects.filter(company=company, is_active=True).order_by('price', 'id')
     methods = PaymentMethod.objects.filter(company=company, is_active=True).count()
-    return render(request, 'portal/public.html', {
+    omada = recent_controller_context(request, company)
+    response = render(request, 'portal/public.html', {
         **_context(company, portal, lang), 'plans': plans, 'methods_count': methods,
         'evpay_available': collection_enabled_for(company)
-        and bool(recent_controller_context(request, company)),
+        and bool(omada),
+        'voucher_available': bool(omada and approved_voucher_route(
+            company, omada.get('apMac'), omada.get('ssidName'))),
     })
+    response['Cache-Control'] = 'private, no-store'
+    response['Referrer-Policy'] = 'same-origin'
+    return response
+
+
+@require_http_methods(['POST'])
+def voucher_redeem(request, slug):
+    company, portal = _business(slug)
+    context = recent_controller_context(request, company)
+    # Limit guesses by the *captive client MAC*, not the shared mobile-network
+    # egress IP. A real deployment uses WHC_REDIS_URL as the Django cache.
+    key_id = (context or {}).get('clientMac', request.META.get('REMOTE_ADDR', 'unknown'))
+    bucket = int(timezone.now().timestamp() // 60)
+    cache_key = 'whc-voucher-attempt-' + hashlib.sha256(
+        f'{company.pk}:{key_id}:{bucket}'.encode('utf-8')).hexdigest()
+    attempts = cache.get(cache_key)
+    if attempts is None:
+        cache.add(cache_key, 0, timeout=75)
+    attempts = cache.incr(cache_key)
+    try:
+        if attempts > 6:
+            raise VoucherError('Too many attempts. Wait one minute and try again.')
+        if not django_settings.WHC_REDIS_URL and not django_settings.DEBUG:
+            raise VoucherError('Voucher activation is temporarily unavailable. Contact the business.')
+        redemption = redeem_voucher(company=company,
+            raw_code=request.POST.get('code', ''), context=context)
+    except VoucherError as exc:
+        response = render(request, 'portal/voucher_result.html', {
+            **_context(company, portal, _locale(request)), 'error': str(exc),
+        }, status=400)
+    else:
+        return redirect('portal:voucher_status', slug=slug, public_id=redemption.public_id)
+    response['Cache-Control'] = 'private, no-store'
+    response['Referrer-Policy'] = 'same-origin'
+    return response
+
+
+@require_http_methods(['GET'])
+def voucher_status(request, slug, public_id):
+    company, portal = _business(slug)
+    redemption = get_object_or_404(
+        VoucherRedemption.objects.select_related('voucher__batch__plan'),
+        company=company, public_id=public_id,
+    )
+    context = recent_controller_context(request, company)
+    if not context or context.get('clientMac') != redemption.client_mac:
+        raise Http404('Reopen this page from your Wi-Fi login session.')
+    response = render(request, 'portal/voucher_result.html', {
+        **_context(company, portal, _locale(request)), 'redemption': redemption,
+    })
+    response['Cache-Control'] = 'private, no-store'
+    response['Referrer-Policy'] = 'no-referrer'
+    return response
 
 
 @require_http_methods(['GET', 'POST'])

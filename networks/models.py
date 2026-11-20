@@ -120,6 +120,11 @@ class OmadaOnboarding(models.Model):
         related_name='approved_omada_live_payment_routers',
     )
     live_payments_note = models.CharField(max_length=400, blank=True)
+    voucher_access_approved_at = models.DateTimeField(null=True, blank=True)
+    voucher_access_approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+        related_name='approved_omada_voucher_routers',
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

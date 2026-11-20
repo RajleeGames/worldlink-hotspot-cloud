@@ -13,14 +13,24 @@
     <h3>{{ plan.name }}</h3><div class="guest-price"><small>TZS</small> {{ plan.price|floatformat:0 }}</div>
     <div class="guest-plan-specs"><span><b>{{ plan.duration_minutes }}</b> {{ w.minutes }}</span><span><b>{{ plan.device_limit }}</b> {{ w.devices }}</span><span><b>{{ plan.download_kbps }}</b> Kbps ↓</span><span>{% if plan.data_limit_mb %}{{ plan.data_limit_mb }} MB{% else %}{{ w.unlimited }}{% endif %}</span></div>
     {% if evpay_available %}<a class="guest-primary" href="{% url 'portal:evpay_checkout' company.slug plan.pk %}?lang={{ lang }}">Pay with mobile money →</a>{% endif %}
-    {% if methods_count %}<a class="guest-primary" href="{% url 'portal:checkout' company.slug plan.pk %}?lang={{ lang }}">{{ w.buy }} <span aria-hidden="true">→</span></a>{% elif not evpay_available %}<span class="guest-primary guest-disabled" aria-disabled="true">{{ w.no_methods }}</span>{% endif %}
+    {% if methods_count %}<a class="guest-primary" href="{% url 'portal:checkout' company.slug plan.pk %}?lang={{ lang }}">{{ w.manual_request }} <span aria-hidden="true">→</span></a>{% elif not evpay_available and not voucher_available %}<span class="guest-primary guest-disabled" aria-disabled="true">{{ w.no_methods }}</span>{% endif %}
   </article>
   {% empty %}<div class="guest-empty">{{ w.no_packages }}</div>{% endfor %}
 </div>
 <div class="guest-bottom-grid">
-  <section class="guest-info"><div class="guest-minor-icon">#</div><div><h3>{{ w.voucher }}</h3><p>{{ w.voucher_note }}</p></div></section>
+  <section class="guest-info guest-voucher-card"><div class="guest-minor-icon">#</div><div class="guest-voucher-content"><h3>{{ w.voucher }}</h3>
+    {% if voucher_available %}
+    <p>{{ w.voucher_note_active }}</p>
+    <form method="post" action="{% url 'portal:voucher_redeem' company.slug %}" class="guest-voucher-form">
+      {% csrf_token %}<input type="hidden" name="lang" value="{{ lang }}">
+      <label class="guest-label" for="voucher-code">{{ w.voucher_code }}</label>
+      <input id="voucher-code" name="code" class="input guest-voucher-input" type="text" maxlength="24" required autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="WHC-XXXXXXXXXX">
+      <button type="submit" class="guest-primary guest-voucher-button">{{ w.voucher_activate }} →</button>
+    </form>
+    {% else %}<p>{{ w.voucher_note }}</p>{% endif %}
+  </div></section>
   <section class="guest-info"><div class="guest-minor-icon">?</div><div><h3>{{ w.help }}</h3><p>{% if portal.support_phone %}<a href="tel:{{ portal.support_phone }}">{{ portal.support_phone }}</a>{% elif company.phone %}{{ company.phone }}{% else %}{{ w.contact }}{% endif %}</p></div></section>
 </div>
 {% if portal.terms %}<p class="guest-terms">{{ portal.terms|linebreaksbr }}</p>{% endif %}
-{% if not evpay_available %}<p class="guest-disclaimer">{{ w.not_live }}</p>{% endif %}
+{% if not evpay_available and not voucher_available %}<p class="guest-disclaimer">{{ w.not_live }}</p>{% endif %}
 {% endblock %}

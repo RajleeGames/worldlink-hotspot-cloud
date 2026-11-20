@@ -129,6 +129,8 @@ def omada_onboarding(request, pk):
             profile.live_payments_approved_at = None
             profile.live_payments_approved_by = None
             profile.live_payments_note = ''
+            profile.voucher_access_approved_at = None
+            profile.voucher_access_approved_by = None
             profile.save()
             OmadaDeviceObservation.objects.filter(router=router).delete()
             messages.success(request, 'Omada setup request sent to WorldLink for review.' if action == 'submit'

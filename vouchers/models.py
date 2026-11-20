@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils import timezone
+import uuid
 from networks.models import WifiPlan
 from tenants.models import Company
 
@@ -19,7 +21,7 @@ class VoucherBatch(models.Model):
 class Voucher(models.Model):
     class Status(models.TextChoices):
         READY='READY','Ready (not activated)'
-        SOLD='SOLD','Sold manually (not activated)'
+        SOLD='SOLD','Sold manually (redeemable after router approval)'
         VOID='VOID','Voided'
     company = models.ForeignKey(Company,on_delete=models.CASCADE,related_name='vouchers')
     batch = models.ForeignKey(VoucherBatch,on_delete=models.CASCADE,related_name='vouchers')
@@ -47,3 +49,29 @@ class ManualSale(models.Model):
         ordering = ['-created_at']
     def __str__(self):
         return f'{self.voucher.code} / {self.amount}'
+
+
+class VoucherRedemption(models.Model):
+    """Single-device Omada entitlement, created only after an offline sale.
+
+    Claiming binds a bearer code to exactly one MAC. The expiry is fixed on the
+    first attempt, even if the controller is temporarily unavailable, so retry
+    requests can never extend the paid package.
+    """
+
+    voucher = models.OneToOneField(Voucher, on_delete=models.PROTECT, related_name='redemption')
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, related_name='voucher_redemptions')
+    client_mac = models.CharField(max_length=17)
+    client_ip = models.GenericIPAddressField()
+    ap_mac = models.CharField(max_length=17)
+    ssid_name = models.CharField(max_length=64)
+    radio_id = models.PositiveSmallIntegerField()
+    claimed_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    activated_at = models.DateTimeField(null=True, blank=True)
+    trying_until = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ['-claimed_at']

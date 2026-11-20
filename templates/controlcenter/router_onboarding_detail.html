@@ -9,7 +9,8 @@
   <div><span class="onboard-step">01</span><strong>Submitted</strong><small>{{ profile.submitted_at|date:'d M Y H:i'|default:'Not submitted' }}</small></div>
   <div><span class="onboard-step">02</span><strong>Site reviewed</strong><small>{{ profile.get_status_display }}</small></div>
   <div><span class="onboard-step">03</span><strong>AP connected</strong><small>{% if connected %}Verified online{% else %}Needs fresh read-only check{% endif %}</small></div>
-  <div><span class="onboard-step">04</span><strong>Payments</strong><small>{% if profile.live_payments_approved_at %}Staff approved · rollout gate applies{% else %}Not approved{% endif %}</small></div>
+  <div><span class="onboard-step">04</span><strong>Voucher access</strong><small>{% if profile.voucher_access_approved_at %}Staff approved{% else %}Not approved{% endif %}</small></div>
+  <div><span class="onboard-step">05</span><strong>EvPay</strong><small>{% if profile.live_payments_approved_at %}Staff approved · rollout gate applies{% else %}Not approved{% endif %}</small></div>
 </div>
 
 <div class="onboard-layout">
@@ -54,6 +55,17 @@
       </div>
       <div class="onboard-help">On the main WorldLink server, run <code>python manage.py poll_omada_managed</code> to refresh trusted Omada status. Only approve live sales after a real device test.</div>
     </section>
+    <section class="panel"><div class="panel-heading"><div><h2>Printed voucher Wi-Fi access</h2><p>Offline cash sales only. Independent of EvPay merchant payments.</p></div></div>
+      {% if profile.voucher_access_approved_at %}
+      <div class="onboard-status onboard-status-online"><strong>Voucher redemption approved</strong><small>Verified by {{ profile.voucher_access_approved_by }} on {{ profile.voucher_access_approved_at|date:'d M Y H:i' }}.</small></div>
+      {% if can_manage_platform %}<form method="post" action="{% url 'controlcenter:router_voucher_access' profile.pk %}" class="onboard-action-form">{% csrf_token %}<button type="submit" class="button button-secondary" name="decision" value="disable">Revoke voucher access</button></form>{% endif %}
+      {% elif can_manage_platform %}
+      <form method="post" action="{% url 'controlcenter:router_voucher_access' profile.pk %}" class="onboard-action-form">{% csrf_token %}
+        <label class="onboard-check"><input type="checkbox" name="hotspot_verified" value="yes" required> I tested the physical AP, exact SSID, and its WorldLink external captive portal.</label>
+        <button type="submit" name="decision" value="enable" class="button button-primary" {% if not can_enable_live %}disabled{% endif %}>Approve printed voucher activation</button>
+        {% if not can_enable_live %}<small class="field-hint">First verify an active business, assigned site and freshly connected AP.</small>{% endif %}
+      </form>{% else %}<div class="onboard-help">Only WorldLink operations can enable voucher internet access.</div>{% endif %}
+    </section>
     <section class="panel"><div class="panel-heading"><div><h2>Live Wi-Fi payment authorization</h2><p>Separate staff approval. It never changes EvPay merchant credentials.</p></div></div>
       <div class="onboard-checks">
         <div><span>Business subscription</span><strong>{{ profile.router.company.get_status_display }}</strong></div>
@@ -72,6 +84,15 @@
         {% if not can_enable_live %}<small class="field-hint">Requires an active company, approved central site, and fresh connected AP observation.</small>{% endif %}
       </form>{% else %}<div class="onboard-help">Only authorized WorldLink staff can enable live payments.</div>{% endif %}
     </section>
+    {% if can_manage_platform and profile.status == 'REVIEWED' %}
+    <section class="panel"><div class="panel-heading"><div><h2>Transfer this physical AP</h2><p>One EAP can serve only one approved tenant at a time. Preserve historical sales and stop new sales before changing its site.</p></div></div>
+      <div class="onboard-help">Wait until all paid sessions end and pending EvPay orders reconcile. For an old legacy pilot, disable its AP/company environment binding first. This only releases database approval; Omada device migration is a separate controlled step.</div>
+      <form method="post" action="{% url 'controlcenter:router_retire' profile.pk %}" class="onboard-action-form">{% csrf_token %}
+        <label for="retire-confirmation" class="guest-label">Type RETIRE to release this AP for another business</label>
+        <input id="retire-confirmation" class="input" name="confirmation" autocomplete="off" required pattern="RETIRE" placeholder="RETIRE">
+        <button type="submit" class="button button-secondary">Retire approval · preserve history</button>
+      </form>
+    </section>{% endif %}
   </div>
 </div>
 {% endblock %}

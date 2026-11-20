@@ -1,0 +1,18 @@
+[Unit]
+Description=WorldLink Central Omada Multi-Business AP Monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=miraji
+Group=miraji
+WorkingDirectory=/var/www/worldlink-hotspot-cloud
+ExecStart=/var/www/worldlink-hotspot-cloud/.venv/bin/python manage.py poll_omada_managed --loop --interval 30 --limit 50
+Restart=on-failure
+RestartSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

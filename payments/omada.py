@@ -40,8 +40,9 @@ def controller_context(request, company):
     These URL parameters are NOT authenticated. Server-side payment confirmation
     and a fixed site/SSID/AP allowlist remain mandatory before authorization.
     """
-    from .collections import collection_enabled_for, approved_payment_route
-    if not collection_enabled_for(company):
+    from .collections import approved_payment_route
+    from vouchers.services import approved_voucher_route
+    if not settings.OMADA_LIVE_ENABLED:
         return None
     params = request.GET
     if not any(key in params for key in ('clientMac', 'apMac', 'ssidName')):
@@ -50,7 +51,9 @@ def controller_context(request, company):
         client_mac = normalize_mac(params.get('clientMac'))
         ap_mac = normalize_mac(params.get('apMac'))
         ssid = params.get('ssidName', '')
-        if not approved_payment_route(company.pk, ap_mac, ssid):
+        if not (approved_voucher_route(company, ap_mac, ssid)
+                or (approved_payment_route(company.pk, ap_mac, ssid)
+                    and collection_enabled_for_company(company))):
             return None
         radio = int(params.get('radioId', ''))
         if radio not in (0, 1):
@@ -72,6 +75,12 @@ def controller_context(request, company):
                'capturedAt': int(time.time())}
     request.session[f'whc_omada_client_{company.pk}'] = payload
     return payload
+
+
+def collection_enabled_for_company(company):
+    """Lazy import avoids a module cycle with the collection authorization layer."""
+    from .collections import collection_enabled_for
+    return collection_enabled_for(company)
 
 
 def recent_controller_context(request, company):
@@ -118,6 +127,18 @@ def authorize_paid_collection(collection):
                         - time.time()) * 1000)
     if remaining_ms <= 0:
         raise OmadaError('Paid package expired before the controller was reachable; contact support.')
+    return _authorize_external_guest(
+        client_mac=collection.client_mac, client_ip=collection.client_ip,
+        ap_mac=collection.ap_mac, ssid_name=collection.ssid_name,
+        radio_id=collection.radio_id, plan=collection.plan, remaining_ms=remaining_ms,
+    )
+
+
+def _authorize_external_guest(*, client_mac, client_ip, ap_mac, ssid_name, radio_id,
+                              plan, remaining_ms):
+    """Bounded time/data/throughput Omada auth; caller verifies entitlement first."""
+    if remaining_ms <= 0:
+        raise OmadaError('Wi-Fi access period has expired.')
     origin = _controller_origin()
     if not settings.OMADA_OPERATOR_NAME or not settings.OMADA_OPERATOR_PASSWORD:
         raise OmadaError('Dedicated Omada Hotspot Operator credentials are missing.')
@@ -144,15 +165,15 @@ def authorize_paid_collection(collection):
         if not isinstance(csrf, str) or not csrf:
             raise OmadaError('Omada did not return an authentication token.')
         body = {
-            'clientMac': collection.client_mac, 'clientIp': collection.client_ip,
-            'apMac': collection.ap_mac, 'ssidName': collection.ssid_name,
-            'radioId': collection.radio_id, 'time': remaining_ms,
+            'clientMac': client_mac, 'clientIp': client_ip,
+            'apMac': ap_mac, 'ssidName': ssid_name,
+            'radioId': radio_id, 'time': remaining_ms,
             'authType': 4, 'originUrl': '',
-            'downloadRateLimitKbps': collection.plan.download_kbps,
-            'uploadRateLimitKbps': collection.plan.upload_kbps,
+            'downloadRateLimitKbps': plan.download_kbps,
+            'uploadRateLimitKbps': plan.upload_kbps,
         }
-        if collection.plan.data_limit_mb:
-            body['totalTrafficLimitBytes'] = collection.plan.data_limit_mb * 1024 * 1024
+        if plan.data_limit_mb:
+            body['totalTrafficLimitBytes'] = plan.data_limit_mb * 1024 * 1024
         post('/api/v2/hotspot/extPortal/auth', body, csrf=csrf)
     except (OSError, URLError, HTTPError, ssl.SSLError, ValueError, json.JSONDecodeError) as exc:
         raise OmadaError('Omada Controller is unreachable or its TLS/API response is invalid.') from exc

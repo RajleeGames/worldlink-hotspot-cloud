@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST
 from tenants.models import Company, Membership
 from networks.forms import OmadaCentralAssignmentForm
 from networks.models import OmadaDeviceObservation, OmadaManagedSite, OmadaOnboarding, Router, WifiPlan
-from vouchers.models import Voucher, ManualSale
+from vouchers.models import Voucher, ManualSale, VoucherRedemption
 from hotspots.models import HotspotSession, HotspotCustomer
 from .auth import platform_required, platform_can_manage
 from .forms import CompanyStatusForm
@@ -68,7 +68,7 @@ def router_onboarding_detail(request, pk):
     profile = get_object_or_404(
         OmadaOnboarding.objects.select_related(
             'router__company', 'router__location', 'reviewed_by', 'managed_site',
-            'live_payments_approved_by',
+            'live_payments_approved_by', 'voucher_access_approved_by',
         ), pk=pk, router__family=Router.Family.OMADA,
     )
     observation = OmadaDeviceObservation.objects.filter(router_id=profile.router_id).first()
@@ -88,6 +88,120 @@ def router_onboarding_detail(request, pk):
     response['Referrer-Policy'] = 'same-origin'
     response['Cache-Control'] = 'private, no-store'
     return response
+
+
+@platform_required(manage=True)
+@require_POST
+@transaction.atomic
+def router_voucher_access(request, pk):
+    """Staff-only independent permission for offline sold vouchers.
+
+    A voucher is never an EvPay deposit; no provider merchant permission is
+    implied by this hardware approval.
+    """
+    profile = get_object_or_404(OmadaOnboarding.objects.select_for_update().select_related(
+        'router__company', 'managed_site'), pk=pk, router__family=Router.Family.OMADA)
+    decision = request.POST.get('decision')
+    if decision == 'disable':
+        profile.voucher_access_approved_at = None
+        profile.voucher_access_approved_by = None
+        message = 'Voucher internet access approval revoked for this AP.'
+    elif decision == 'enable':
+        observation = OmadaDeviceObservation.objects.filter(router_id=profile.router_id).first()
+        if not (profile.router.company.status == Company.Status.ACTIVE
+                and profile.status == OmadaOnboarding.Status.REVIEWED
+                and profile.reviewed_by_id and profile.managed_site_id
+                and profile.managed_site.company_id == profile.router.company_id
+                and bool(profile.managed_site.openapi_site_id)
+                and profile.connection_mode == OmadaOnboarding.ConnectionMode.CENTRAL
+                and profile.ap_mac and profile.ssid_name and observation
+                and observation.is_fresh and observation.state == OmadaDeviceObservation.State.CONNECTED):
+            messages.error(request, 'Check the assigned central site and refresh its connected AP status first.')
+            return redirect('controlcenter:router_onboarding_detail', pk=pk)
+        if request.POST.get('hotspot_verified') != 'yes':
+            messages.error(request, 'Confirm a physical captive-portal test on this exact AP and SSID.')
+            return redirect('controlcenter:router_onboarding_detail', pk=pk)
+        if OmadaOnboarding.objects.filter(
+                status=OmadaOnboarding.Status.REVIEWED, ap_mac__iexact=profile.ap_mac,
+                voucher_access_approved_at__isnull=False).exclude(pk=pk).exists():
+            messages.error(request, 'Another business already has voucher authorization for this AP.')
+            return redirect('controlcenter:router_onboarding_detail', pk=pk)
+        from payments.omada import normalize_mac
+        try:
+            still_pilot = (settings.OMADA_PILOT_COMPANY_ID != profile.router.company_id
+                           and settings.OMADA_AP_MAC
+                           and normalize_mac(settings.OMADA_AP_MAC) == normalize_mac(profile.ap_mac))
+        except ValueError:
+            still_pilot = False
+        if still_pilot:
+            messages.error(request, 'Retire the old pilot AP binding before moving this physical AP to another business.')
+            return redirect('controlcenter:router_onboarding_detail', pk=pk)
+        profile.voucher_access_approved_at = timezone.now()
+        profile.voucher_access_approved_by = request.user
+        message = 'Voucher-only access approved. EvPay live charges are still a separate permission.'
+    else:
+        messages.error(request, 'Invalid voucher approval decision.')
+        return redirect('controlcenter:router_onboarding_detail', pk=pk)
+    profile.save(update_fields=['voucher_access_approved_at', 'voucher_access_approved_by', 'updated_at'])
+    PlatformAudit.objects.create(actor=request.user, company=profile.router.company,
+        action='OMADA_VOUCHER_ACCESS_GATE', note=f'Router #{profile.router_id}; request #{pk}; decision {decision}.')
+    messages.success(request, message)
+    return redirect('controlcenter:router_onboarding_detail', pk=pk)
+
+
+@platform_required(manage=True)
+@require_POST
+@transaction.atomic
+def router_retire(request, pk):
+    """Safely free one EAP MAC for another business without deleting history."""
+    from payments.models import EvPayCollection
+    from payments.collections import EARNING_STATUSES
+    from payments.omada import normalize_mac
+    profile = get_object_or_404(OmadaOnboarding.objects.select_for_update().select_related(
+        'router__company'), pk=pk, router__family=Router.Family.OMADA)
+    if request.POST.get('confirmation') != 'RETIRE':
+        messages.error(request, 'Type RETIRE to release a physical AP from this business.')
+        return redirect('controlcenter:router_onboarding_detail', pk=pk)
+    if profile.status != OmadaOnboarding.Status.REVIEWED:
+        messages.error(request, 'Only a currently reviewed AP can be retired.')
+        return redirect('controlcenter:router_onboarding_detail', pk=pk)
+    try:
+        ap_mac = normalize_mac(profile.ap_mac)
+        pilot_match = (settings.OMADA_LIVE_ENABLED and settings.OMADA_PILOT_COMPANY_ID == profile.router.company_id
+                       and settings.OMADA_AP_MAC and normalize_mac(settings.OMADA_AP_MAC) == ap_mac)
+    except ValueError:
+        messages.error(request, 'Verify the AP MAC and pilot settings first.')
+        return redirect('controlcenter:router_onboarding_detail', pk=pk)
+    if pilot_match:
+        messages.error(request, 'Stop the old legacy pilot in VPS .env (OMADA_PILOT_COMPANY_ID=0 and remove its AP/SSID binding), restart services, then release this AP.')
+        return redirect('controlcenter:router_onboarding_detail', pk=pk)
+    pending = EvPayCollection.objects.filter(company=profile.router.company,
+        ap_mac__iexact=ap_mac, status__in=['CREATED', 'UNKNOWN', 'PENDING', 'PROCESSING', 'ON-HOLD'],
+        created_at__gte=timezone.now() - timedelta(hours=1)).exists()
+    paid = any(payment.confirmed_at + timedelta(minutes=payment.plan.duration_minutes) > timezone.now()
+               for payment in EvPayCollection.objects.filter(company=profile.router.company,
+                   ap_mac__iexact=ap_mac, status__in=EARNING_STATUSES,
+                   confirmed_at__isnull=False).select_related('plan').order_by('-confirmed_at')[:500])
+    vouchers_active = VoucherRedemption.objects.filter(company=profile.router.company,
+        ap_mac__iexact=ap_mac, expires_at__gt=timezone.now()).exists()
+    if pending or paid or vouchers_active:
+        messages.error(request, 'The AP still has a recent pending payment or active paid/voucher session. Wait until all expire and reconcile before retiring.')
+        return redirect('controlcenter:router_onboarding_detail', pk=pk)
+    profile.status = OmadaOnboarding.Status.NEEDS_INFO
+    profile.review_note = 'AP retired by WorldLink. Historical payment and voucher records preserved.'
+    profile.live_payments_approved_at = None
+    profile.live_payments_approved_by = None
+    profile.live_payments_note = ''
+    profile.voucher_access_approved_at = None
+    profile.voucher_access_approved_by = None
+    profile.save(update_fields=['status', 'review_note', 'live_payments_approved_at',
+        'live_payments_approved_by', 'live_payments_note', 'voucher_access_approved_at',
+        'voucher_access_approved_by', 'updated_at'])
+    OmadaDeviceObservation.objects.filter(router_id=profile.router_id).delete()
+    PlatformAudit.objects.create(actor=request.user, company=profile.router.company,
+        action='OMADA_AP_RETIRED', note=f'Router #{profile.router_id}, request #{pk}, MAC {ap_mac}.')
+    messages.success(request, 'This AP has been released for reassignment. Historic transactions and router inventory were kept.')
+    return redirect('controlcenter:router_onboarding_detail', pk=pk)
 
 
 @platform_required(manage=True)
@@ -207,9 +321,12 @@ def review_router_onboarding(request, pk):
     profile.live_payments_approved_at = None
     profile.live_payments_approved_by = None
     profile.live_payments_note = ''
+    profile.voucher_access_approved_at = None
+    profile.voucher_access_approved_by = None
     profile.save(update_fields=['status', 'review_note', 'reviewed_by', 'reviewed_at',
                                 'managed_site', 'live_payments_approved_at',
-                                'live_payments_approved_by', 'live_payments_note', 'updated_at'])
+                                'live_payments_approved_by', 'live_payments_note',
+                                'voucher_access_approved_at', 'voucher_access_approved_by', 'updated_at'])
     OmadaDeviceObservation.objects.filter(router_id=profile.router_id).delete()
     PlatformAudit.objects.create(
         actor=request.user, company=profile.router.company, action='OMADA_INTAKE_REVIEWED',

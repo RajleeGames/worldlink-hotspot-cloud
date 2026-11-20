@@ -32,14 +32,14 @@ def batch_create(request):
         with transaction.atomic():
             batch=VoucherBatch.objects.create(company=request.active_company,plan=form.cleaned_data['plan'],label=form.cleaned_data['label'],quantity=len(codes),created_by=request.user)
             Voucher.objects.bulk_create([Voucher(company=request.active_company,batch=batch,code=code) for code in codes])
-        messages.success(request,f'{len(codes)} unique vouchers created. They are NOT live router credentials yet.')
+        messages.success(request,f'{len(codes)} unique vouchers created. Record each paid sale before the customer can redeem on an approved Omada AP.')
         return redirect('vouchers:batch_detail',pk=batch.pk)
     return render(request,'vouchers/create.html',{'form':form,'page_title':'Generate vouchers'})
 
 @require_tenant()
 def batch_detail(request,pk):
     batch=get_object_or_404(VoucherBatch.objects.select_related('plan'),pk=pk,company=request.active_company)
-    vouchers=batch.vouchers.select_related('manual_sale').all()
+    vouchers=batch.vouchers.select_related('manual_sale', 'redemption').all()
     return render(request,'vouchers/detail.html',{'batch':batch,'vouchers':vouchers,'page_title':f'Batch #{batch.pk}'})
 
 @require_tenant('OWNER','MANAGER','CASHIER')
@@ -58,7 +58,7 @@ def manual_sell(request,pk):
                 ManualSale.objects.create(company=request.active_company,voucher=voucher,amount=voucher.batch.plan.price,method=form.cleaned_data['method'],notes=form.cleaned_data['notes'],recorded_by=request.user)
                 voucher.status=Voucher.Status.SOLD
                 voucher.save(update_fields=['status'])
-                messages.success(request,'Manual sale recorded. No automatic payment or network activation occurred.')
+                messages.success(request,'Manual cash/bank sale recorded. Customer can now redeem this code on an approved Omada hotspot; no internet has yet been activated.')
         except IntegrityError:
             messages.error(request,'This voucher has already been sold.')
     else:
@@ -73,9 +73,15 @@ def batch_export(request,pk):
     response['Content-Disposition']=f'attachment; filename="worldlink-batch-{batch.pk}.csv"'
     response.write('\ufeff')
     writer=csv.writer(response)
-    writer.writerow(['Voucher code','Package','Duration minutes','Price TZS','Recorded status','Warning'])
-    for voucher in batch.vouchers.all():
-        writer.writerow([voucher.code,batch.plan.name,batch.plan.duration_minutes,batch.plan.price,voucher.status,'NOT ROUTER-ACTIVATED'])
+    writer.writerow(['Voucher code','Package','Duration minutes','Price TZS','Recorded status',
+                     'First redemption (UTC)','Internet activated (UTC)','Expires (UTC)','Notes'])
+    for voucher in batch.vouchers.select_related('redemption'):
+        redemption = getattr(voucher, 'redemption', None)
+        writer.writerow([voucher.code,batch.plan.name,batch.plan.duration_minutes,batch.plan.price,
+                         voucher.status, redemption.claimed_at if redemption else '',
+                         redemption.activated_at if redemption else '',
+                         redemption.expires_at if redemption else '',
+                         'Redeem on approved Omada AP after offline sale; not an EvPay payment.'])
     return response
 
 
