@@ -55,8 +55,14 @@ def controller_context(request, company):
         radio = int(params.get('radioId', ''))
         if radio not in (0, 1):
             return None
-        epoch = int(params.get('t', ''))
-        if abs(time.time() - epoch / 1000) > 300:
+        # Omada v6.3 EAP redirects can supply 10-digit epoch seconds, while
+        # the documented external-portal format uses 13-digit milliseconds.
+        # Accept either representation without relaxing the 5-minute window.
+        timestamp = params.get('t', '')
+        if not re.fullmatch(r'(?:\d{10}|\d{13})', timestamp):
+            return None
+        epoch_seconds = int(timestamp) if len(timestamp) == 10 else int(timestamp) / 1000
+        if abs(time.time() - epoch_seconds) > 300:
             return None
         client_ip = str(ipaddress.ip_address(params.get('clientIp', '')))
     except (ValueError, TypeError):

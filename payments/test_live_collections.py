@@ -157,6 +157,22 @@ class CollectionSafetyTests(TestCase):
         self.assertEqual(obj.client_mac, self.context['clientMac'])
         self.assertEqual(obj.status, 'PENDING')
 
+    def test_omada_redirect_supports_seconds_and_milliseconds_but_not_stale_time(self):
+        url = reverse('portal:public', args=[self.company.slug])
+        now = int(time.time())
+        for timestamp in (now, now * 1000):
+            response = self.client.get(url, {**self.context, 't': timestamp})
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'Pay with mobile money')
+
+        for timestamp in (now - 600, (now + 600) * 1000, now * 100):
+            session = self.client.session
+            session.pop(f'whc_omada_client_{self.company.pk}', None)
+            session.save()
+            response = self.client.get(url, {**self.context, 't': timestamp})
+            self.assertEqual(response.status_code, 200)
+            self.assertNotContains(response, 'Pay with mobile money')
+
     def test_finance_clearance_requires_real_evidence_and_never_credits_twice(self):
         obj = self._collection()
         self._event(obj)
