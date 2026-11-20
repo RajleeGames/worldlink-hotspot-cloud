@@ -137,6 +137,7 @@ if WHC_REDIS_URL:
 # One EAP/one company pilot. Additional independent businesses require an
 # explicitly configured controller and verified merchant/submerchant agreement.
 OMADA_LIVE_ENABLED = flag('OMADA_LIVE_ENABLED', False)
+EVPAY_MULTITENANT_ENABLED = flag('EVPAY_MULTITENANT_ENABLED', False)
 OMADA_PILOT_COMPANY_ID = int(os.environ.get('OMADA_PILOT_COMPANY_ID') or '0')
 OMADA_CONTROLLER_URL = os.environ.get('OMADA_CONTROLLER_URL', '').rstrip('/')
 OMADA_CONTROLLER_ID = os.environ.get('OMADA_CONTROLLER_ID', '')

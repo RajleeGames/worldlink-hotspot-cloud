@@ -1,5 +1,6 @@
 """WorldLink-only management. Platform staff never acquire tenant ownership."""
 from datetime import timedelta
+from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -61,37 +62,121 @@ def router_onboardings(request):
     return response
 
 
+@platform_required()
+def router_onboarding_detail(request, pk):
+    """Dedicated responsive staff workflow. Customer credentials never appear here."""
+    profile = get_object_or_404(
+        OmadaOnboarding.objects.select_related(
+            'router__company', 'router__location', 'reviewed_by', 'managed_site',
+            'live_payments_approved_by',
+        ), pk=pk, router__family=Router.Family.OMADA,
+    )
+    observation = OmadaDeviceObservation.objects.filter(router_id=profile.router_id).first()
+    connected = bool(observation and observation.state == OmadaDeviceObservation.State.CONNECTED
+                     and observation.is_fresh)
+    response = render(request, 'controlcenter/router_onboarding_detail.html', {
+        'page_title': f'Router review · {profile.router.name}', 'profile': profile,
+        'observation': observation, 'connected': connected,
+        'can_manage_platform': platform_can_manage(request.user),
+        'can_enable_live': profile.router.company.status == Company.Status.ACTIVE and connected
+                           and profile.status == OmadaOnboarding.Status.REVIEWED
+                           and profile.connection_mode == OmadaOnboarding.ConnectionMode.CENTRAL
+                           and profile.managed_site_id is not None,
+        'multitenant_flag': settings.EVPAY_MULTITENANT_ENABLED,
+        'company_allowlisted': profile.router.company_id in settings.EVPAY_COLLECTION_COMPANY_IDS,
+    })
+    response['Referrer-Policy'] = 'same-origin'
+    response['Cache-Control'] = 'private, no-store'
+    return response
+
+
+@platform_required(manage=True)
+@require_POST
+@transaction.atomic
+def router_live_payments(request, pk):
+    """Separate explicit financial authorization; never part of initial review."""
+    profile = get_object_or_404(OmadaOnboarding.objects.select_for_update().select_related(
+        'router__company', 'managed_site'), pk=pk, router__family=Router.Family.OMADA)
+    decision = request.POST.get('decision')
+    if decision == 'disable':
+        profile.live_payments_approved_at = None
+        profile.live_payments_approved_by = None
+        profile.live_payments_note = ''
+        message = 'Live payment permission revoked for this access point.'
+    elif decision == 'enable':
+        observation = OmadaDeviceObservation.objects.filter(router_id=profile.router_id).first()
+        if not (profile.connection_mode == OmadaOnboarding.ConnectionMode.CENTRAL
+                and profile.status == OmadaOnboarding.Status.REVIEWED
+                and profile.reviewed_by_id and profile.managed_site_id
+                and profile.managed_site.company_id == profile.router.company_id
+                and profile.managed_site.openapi_site_id
+                and profile.ap_mac and profile.ssid_name
+                and profile.router.company.status == Company.Status.ACTIVE
+                and observation and observation.is_fresh
+                and observation.state == OmadaDeviceObservation.State.CONNECTED):
+            messages.error(request, 'Activate only after site review, active subscription, and a fresh connected AP check.')
+            return redirect('controlcenter:router_onboarding_detail', pk=pk)
+        if (request.POST.get('provider_authorized') != 'yes'
+                or request.POST.get('test_verified') != 'yes'):
+            messages.error(request, 'Confirm provider permission and a successful real-device captive-portal test.')
+            return redirect('controlcenter:router_onboarding_detail', pk=pk)
+        if OmadaOnboarding.objects.filter(
+                status=OmadaOnboarding.Status.REVIEWED, ap_mac__iexact=profile.ap_mac,
+                live_payments_approved_at__isnull=False).exclude(pk=pk).exists():
+            messages.error(request, 'This AP already has live payment approval under another request.')
+            return redirect('controlcenter:router_onboarding_detail', pk=pk)
+        profile.live_payments_approved_at = timezone.now()
+        profile.live_payments_approved_by = request.user
+        profile.live_payments_note = 'WorldLink confirmed provider permission and captive-portal hardware test.'
+        message = 'Hardware payment approval recorded. Global business allowlist and rollout gate still apply.'
+    else:
+        messages.error(request, 'Invalid payment permission decision.')
+        return redirect('controlcenter:router_onboarding_detail', pk=pk)
+    profile.save(update_fields=['live_payments_approved_at', 'live_payments_approved_by',
+                                'live_payments_note', 'updated_at'])
+    PlatformAudit.objects.create(actor=request.user, company=profile.router.company,
+                                 action='OMADA_LIVE_PAYMENT_GATE',
+                                 note=f'Router #{profile.router_id}; request #{pk}; decision {decision}.')
+    messages.success(request, message)
+    return redirect('controlcenter:router_onboarding_detail', pk=pk)
+
+
 @platform_required(manage=True)
 @require_POST
 @transaction.atomic
 def review_router_onboarding(request, pk):
+    detail = request.POST.get('review_page') == '1'
+    def back():
+        if detail:
+            return redirect('controlcenter:router_onboarding_detail', pk=pk)
+        return redirect('controlcenter:router_onboardings')
     profile = get_object_or_404(
         OmadaOnboarding.objects.select_for_update().select_related('router__company'), pk=pk,
         router__family=Router.Family.OMADA,
     )
     if profile.status != OmadaOnboarding.Status.SUBMITTED:
         messages.error(request, 'Only newly submitted requests can be reviewed.')
-        return redirect('controlcenter:router_onboardings')
+        return back()
     action = request.POST.get('decision')
     if action not in ('needs_info', 'reviewed'):
         messages.error(request, 'Choose an allowed review decision.')
-        return redirect('controlcenter:router_onboardings')
+        return back()
     note = request.POST.get('note', '').strip()
     if len(note) > 400 or (action == 'needs_info' and not note):
         messages.error(request, 'A request for more information needs a note (max 400 characters).')
-        return redirect('controlcenter:router_onboardings')
+        return back()
     if action == 'reviewed' and profile.connection_mode == OmadaOnboarding.ConnectionMode.CENTRAL:
         assignment = OmadaCentralAssignmentForm(request.POST)
         if not assignment.is_valid():
             messages.error(request, 'Central site mapping is incomplete or invalid. Enter site name, Inform omadacId and Open API siteId.')
-            return redirect('controlcenter:router_onboardings')
+            return back()
         data = assignment.cleaned_data
         # Never assign one AP to two active businesses, even if both submit it.
         if OmadaOnboarding.objects.filter(
             status=OmadaOnboarding.Status.REVIEWED, ap_mac__iexact=profile.ap_mac,
         ).exclude(pk=profile.pk).exists():
             messages.error(request, 'This AP MAC is already assigned to a reviewed router. Resolve the conflict first.')
-            return redirect('controlcenter:router_onboardings')
+            return back()
         site = OmadaManagedSite.objects.select_for_update().filter(
             inform_site_id=data['inform_site_id'],
         ).first()
@@ -99,11 +184,11 @@ def review_router_onboarding(request, pk):
             if (site.company_id != profile.router.company_id
                     or site.openapi_site_id != data['openapi_site_id']):
                 messages.error(request, 'That central site belongs to another business or has a different Open API ID.')
-                return redirect('controlcenter:router_onboardings')
+                return back()
         else:
             if OmadaManagedSite.objects.filter(openapi_site_id=data['openapi_site_id']).exists():
                 messages.error(request, 'That Open API site ID is already assigned elsewhere.')
-                return redirect('controlcenter:router_onboardings')
+                return back()
             try:
                 with transaction.atomic():
                     site = OmadaManagedSite.objects.create(
@@ -112,14 +197,19 @@ def review_router_onboarding(request, pk):
                     )
             except IntegrityError:
                 messages.error(request, 'Another WorldLink review assigned this site first. Refresh and verify its ownership.')
-                return redirect('controlcenter:router_onboardings')
+                return back()
         profile.managed_site = site
     profile.status = (OmadaOnboarding.Status.NEEDS_INFO if action == 'needs_info'
                       else OmadaOnboarding.Status.REVIEWED)
     profile.review_note = note
     profile.reviewed_by = request.user
     profile.reviewed_at = timezone.now()
-    profile.save(update_fields=['status', 'review_note', 'reviewed_by', 'reviewed_at', 'managed_site', 'updated_at'])
+    profile.live_payments_approved_at = None
+    profile.live_payments_approved_by = None
+    profile.live_payments_note = ''
+    profile.save(update_fields=['status', 'review_note', 'reviewed_by', 'reviewed_at',
+                                'managed_site', 'live_payments_approved_at',
+                                'live_payments_approved_by', 'live_payments_note', 'updated_at'])
     OmadaDeviceObservation.objects.filter(router_id=profile.router_id).delete()
     PlatformAudit.objects.create(
         actor=request.user, company=profile.router.company, action='OMADA_INTAKE_REVIEWED',
@@ -127,7 +217,7 @@ def review_router_onboarding(request, pk):
              f'central site #{profile.managed_site_id or "none"}.',
     )
     messages.success(request, 'Setup request reviewed. No router or payment settings were changed.')
-    return redirect('controlcenter:router_onboardings')
+    return back()
 
 @platform_required()
 def businesses(request):

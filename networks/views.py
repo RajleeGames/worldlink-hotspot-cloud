@@ -36,7 +36,10 @@ def router_edit(request, pk=None):
             return redirect('networks:omada_onboarding', pk=router.pk)
         messages.success(request, 'Router saved. For MikroTik, use Connect & sync to test the gateway.')
         return redirect('networks:routers')
-    return render(request,'networks/form.html',{'form':form,'page_title':'Edit router' if obj else 'Add router','form_type':'router'})
+    response = render(request,'networks/form.html',{'form':form,'page_title':'Edit router' if obj else 'Add router','form_type':'router'})
+    response['Referrer-Policy'] = 'same-origin'
+    response['Cache-Control'] = 'private, no-store'
+    return response
 
 
 @require_tenant('OWNER', 'MANAGER', 'TECHNICIAN')
@@ -123,6 +126,9 @@ def omada_onboarding(request, pk):
             profile.reviewed_by = None
             profile.review_note = ''
             profile.managed_site = None
+            profile.live_payments_approved_at = None
+            profile.live_payments_approved_by = None
+            profile.live_payments_note = ''
             profile.save()
             OmadaDeviceObservation.objects.filter(router=router).delete()
             messages.success(request, 'Omada setup request sent to WorldLink for review.' if action == 'submit'

@@ -35,7 +35,7 @@
         <span class="nav-heading">WORLDLINK · OPERATIONS</span>
         <a href="{% url 'controlcenter:overview' %}" class="nav-link {% if request.resolver_match.url_name == 'overview' %}active{% endif %}"><svg class="icon"><use href="#ico-grid"></use></svg><span>{% t 'Control Center' %}</span></a>
         <a href="{% url 'controlcenter:businesses' %}" class="nav-link {% if request.resolver_match.url_name == 'businesses' or request.resolver_match.url_name == 'business_detail' %}active{% endif %}"><svg class="icon"><use href="#ico-router"></use></svg><span>{% t 'All businesses' %}</span></a>
-        <a href="{% url 'controlcenter:router_onboardings' %}" class="nav-link {% if request.resolver_match.url_name == 'router_onboardings' %}active{% endif %}"><svg class="icon"><use href="#ico-router"></use></svg><span>Router onboarding</span></a>
+        <a href="{% url 'controlcenter:router_onboardings' %}" class="nav-link {% if request.resolver_match.url_name == 'router_onboardings' or request.resolver_match.url_name == 'router_onboarding_detail' %}active{% endif %}"><svg class="icon"><use href="#ico-router"></use></svg><span>Router onboarding</span></a>
         <a href="{% url 'controlcenter:users' %}" class="nav-link {% if request.resolver_match.url_name == 'users' or request.resolver_match.url_name == 'user_detail' %}active{% endif %}"><svg class="icon"><use href="#ico-user"></use></svg><span>{% t 'All user accounts' %}</span></a>
         <a href="{% url 'controlcenter:platform_customers' %}" class="nav-link {% if request.resolver_match.url_name == 'platform_customers' %}active{% endif %}"><svg class="icon"><use href="#ico-user"></use></svg><span>{% t 'Hotspot customers' %}</span></a>
         <a href="{% url 'controlcenter:platform_sessions' %}" class="nav-link {% if request.resolver_match.url_name == 'platform_sessions' %}active{% endif %}"><svg class="icon"><use href="#ico-chart"></use></svg><span>{% t 'Platform sessions' %}</span></a>
@@ -113,7 +113,7 @@
     </header>
     <main class="content" id="main-content">
       {% if messages %}<div class="flash-stack">{% for message in messages %}<div class="flash {{ message.tags }}" role="status">{{ message }}<button class="flash-dismiss" type="button" data-dismiss aria-label="Close">×</button></div>{% endfor %}</div>{% endif %}
-      <div class="integration-notice"><span class="notice-dot"></span><span>{% if omada_paid_pilot_enabled %}Approved Omada pilot: paid guest access is enabled. Router monitoring is separate from payment activation; inventory vouchers are not Omada login codes.{% else %}{% t 'Real router activation is not yet connected. Vouchers here are inventory records, not working internet credentials.' %}{% endif %}</span></div>
+      <div class="integration-notice"><span class="notice-dot"></span><span>{% if omada_paid_pilot_enabled %}WorldLink-approved Wi-Fi payment route configured. Access is authorized only after EvPay confirms each payment; inventory vouchers are not Omada login codes.{% else %}Router payment activation is awaiting WorldLink approval. Inventory vouchers do not automatically grant Omada internet access.{% endif %}</span></div>
       {% block content %}{% endblock %}
       <footer class="footer"><span>© 2026 {{ platform_brand.name|default:'WORLDLINK SECURITY SYSTEMS' }}</span><span>WorldLink Hotspot Cloud · v0.9</span></footer>
     </main>

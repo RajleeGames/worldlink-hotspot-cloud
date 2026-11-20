@@ -1,7 +1,8 @@
-"""Omada v6.2.10+ External Portal authorization through a trusted HTTPS VPN.
+"""Omada v6.2.10+ External Portal authorization through trusted HTTPS.
 
-Never expose 8043 publicly, send controller credentials to the browser, or
-disable TLS certificate verification. Use a dedicated Hotspot Operator account.
+Keep the central controller API IP-restricted and TLS verified. Never publish
+controller credentials to browsers or disable certificate verification.
+Use a dedicated WorldLink Hotspot Operator account.
 """
 import ipaddress
 import json
@@ -39,7 +40,8 @@ def controller_context(request, company):
     These URL parameters are NOT authenticated. Server-side payment confirmation
     and a fixed site/SSID/AP allowlist remain mandatory before authorization.
     """
-    if not settings.OMADA_LIVE_ENABLED or company.pk != settings.OMADA_PILOT_COMPANY_ID:
+    from .collections import collection_enabled_for, approved_payment_route
+    if not collection_enabled_for(company):
         return None
     params = request.GET
     if not any(key in params for key in ('clientMac', 'apMac', 'ssidName')):
@@ -47,10 +49,8 @@ def controller_context(request, company):
     try:
         client_mac = normalize_mac(params.get('clientMac'))
         ap_mac = normalize_mac(params.get('apMac'))
-        if ap_mac != normalize_mac(settings.OMADA_AP_MAC):
-            return None
         ssid = params.get('ssidName', '')
-        if ssid != settings.OMADA_SSID:
+        if not approved_payment_route(company.pk, ap_mac, ssid):
             return None
         radio = int(params.get('radioId', ''))
         if radio not in (0, 1):
@@ -101,15 +101,18 @@ def _controller_origin():
 
 def authorize_paid_collection(collection):
     """Request one bounded Wi-Fi authorization; called only by a trusted worker."""
-    if not settings.OMADA_LIVE_ENABLED or collection.company_id != settings.OMADA_PILOT_COMPANY_ID:
-        raise OmadaError('Omada pilot is not enabled for this business.')
+    from tenants.models import Company
+    from .collections import collection_enabled_for, approved_payment_route
+    company = Company.objects.filter(pk=collection.company_id).first()
+    if not company or not collection_enabled_for(company):
+        raise OmadaError('Live hotspot payments are not approved for this business.')
     if collection.status not in EARNING_STATUSES or not collection.confirmed_at:
         raise OmadaError('Payment has not been verified by EvPay.')
     if collection.omada_activated_at:
         return True
     if not collection.client_mac or not collection.ap_mac or not collection.ssid_name:
         raise OmadaError('No captive portal session is bound to this payment.')
-    if normalize_mac(collection.ap_mac) != normalize_mac(settings.OMADA_AP_MAC) or collection.ssid_name != settings.OMADA_SSID:
+    if not approved_payment_route(collection.company_id, collection.ap_mac, collection.ssid_name):
         raise OmadaError('Unexpected AP or SSID for this payment.')
     remaining_ms = int((collection.confirmed_at.timestamp() + collection.plan.duration_minutes * 60
                         - time.time()) * 1000)

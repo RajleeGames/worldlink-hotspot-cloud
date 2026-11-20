@@ -9,6 +9,11 @@
   <a class="button button-secondary" href="{% url 'networks:routers' %}">← Routers</a>
 </div>
 
+<div class="onboard-progress"><div><span class="onboard-step">01</span><strong>Router registered</strong><small>{{ router.name }}</small></div>
+  <div><span class="onboard-step">02</span><strong>Setup submitted</strong><small>{% if profile.submitted_at %}{{ profile.submitted_at|date:'d M Y' }}{% else %}Awaiting submission{% endif %}</small></div>
+  <div><span class="onboard-step">03</span><strong>WorldLink review</strong><small>{% if profile.status == 'REVIEWED' %}Site assigned{% else %}Pending approval{% endif %}</small></div>
+  <div><span class="onboard-step">04</span><strong>Live Wi-Fi</strong><small>{% if profile.live_payments_approved_at %}Staff-approved; activation gate applies{% else %}Needs hardware test and payment approval{% endif %}</small></div></div>
+
 <div class="integration-notice important">
   No VPN, Tailscale or Omada server is required for the recommended WorldLink connection.
   Approval and router adoption are separate steps. Payments and customer internet are enabled only after additional live testing.
@@ -17,6 +22,7 @@
 {% if profile %}
 <div class="router-notice">
   <strong>Current request: {{ profile.get_status_display }}</strong>
+  {% if profile.live_payments_approved_at %}<p><strong>WorldLink payment approval recorded:</strong> your router is approved by staff, but actual checkout still depends on the business being on the live payment allowlist and WorldLink rollout settings.</p>{% endif %}
   {% if profile.submitted_at %}<p>Sent {{ profile.submitted_at|date:'d M Y H:i' }}.</p>{% endif %}
   {% if profile.review_note %}<p>Message from WorldLink: {{ profile.review_note }}</p>{% endif %}
   {% if profile.status == 'REVIEWED' and profile.connection_mode == 'CENTRAL' %}
@@ -34,13 +40,13 @@
 </div>
 {% endif %}
 
-<div class="wallet-columns">
+<div class="onboard-layout">
   <section class="panel">
     <div class="panel-heading"><div><h2>Access point and guest Wi-Fi</h2><p>Choose WorldLink central Omada for the easiest setup. No password or API key needed.</p></div></div>
-    <form method="post" class="form-grid" autocomplete="off">{% csrf_token %}
+    <form method="post" class="onboard-form" autocomplete="off">{% csrf_token %}
       {% for field in form %}
       {% if field.name == 'controller_origin' %}<details class="span-2" {% if form.connection_mode.value == 'VPN' %}open{% endif %}>
-        <summary>Advanced: I already operate my own Omada controller</summary><div class="form-grid">{% endif %}
+        <summary>Advanced: I already operate my own Omada controller</summary><div class="onboard-advanced">{% endif %}
       <div class="field {% if field.name == 'setup_notes' or field.name == 'connection_mode' %}span-2{% endif %}">
         <label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
         {% if field.name == 'controller_origin' or field.name == 'controller_id' %}<small class="field-hint">Only for businesses connecting a separate private controller; leave blank for WorldLink central Omada.</small>{% endif %}
@@ -50,7 +56,7 @@
       {% if field.name == 'controller_id' %}</div></details>{% endif %}
       {% endfor %}
       {% if form.non_field_errors %}<div class="field-error">{{ form.non_field_errors }}</div>{% endif %}
-      <div class="form-actions span-2">
+      <div class="onboard-form-actions span-2">
         <button class="button button-secondary" name="action" value="save" type="submit">Save draft</button>
         <button class="button button-primary" name="action" value="submit" type="submit">Request WorldLink review</button>
       </div>

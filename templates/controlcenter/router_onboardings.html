@@ -1,50 +1,24 @@
-{% extends 'base.html' %}{% load translations %}
+{% extends 'base.html' %}
 {% block content %}
-<div class="page-heading">
-  <div><p class="eyebrow">WORLDLINK · NETWORK OPERATIONS</p><h1>Omada onboarding requests</h1>
-    <p>Each customer submits their AP details. WorldLink assigns a separate central Omada site and verifies the hardware.</p></div>
-  <a class="button button-secondary" href="{% url 'controlcenter:overview' %}">← Control Center</a>
+<div class="page-heading"><div><p class="eyebrow">WORLDLINK · NETWORK OPERATIONS</p><h1>Omada onboarding requests</h1>
+  <p>Each business has its own managed site, separate hardware verification and payment approval.</p></div>
+  <a class="button button-secondary" href="{% url 'controlcenter:overview' %}">← Control Center</a></div>
+<div class="onboard-banner"><strong>Easy multi-business setup, with WorldLink approval</strong><span>Customers submit AP details from anywhere. Open each request on its own page to assign the central site, verify its connection, and authorize payments separately. No VPN or shared admin passwords required.</span></div>
+<div class="onboard-card-list">
+  {% for item in records %}
+  <article class="onboard-request">
+    <div class="onboard-request-main"><div class="onboard-avatar">{{ item.router.company.name|slice:':1'|upper }}</div>
+      <div class="onboard-request-copy"><span class="eyebrow">{{ item.router.company.name }} · {{ item.router.location.name }}</span>
+        <h2>{{ item.router.name }}</h2><p>{{ item.router.model_name }} · <span class="mono">{{ item.ap_mac|default:'AP MAC missing' }}</span></p>
+        <small>Guest Wi-Fi: {{ item.ssid_name|default:'Awaiting SSID' }} · {{ item.updated_at|date:'d M Y H:i' }}</small></div></div>
+    <div class="onboard-request-meta"><span class="pill {% if item.status == 'REVIEWED' %}ready{% else %}pending{% endif %}">{{ item.get_status_display }}</span>
+      {% if item.live_payments_approved_at %}<span class="pill ready">Payment approval recorded</span>{% elif item.managed_site %}<span class="pill pending">Payments not approved</span>{% endif %}
+      <a class="button button-primary" href="{% url 'controlcenter:router_onboarding_detail' item.pk %}">Open review page →</a></div>
+  </article>
+  {% empty %}
+  <div class="onboard-empty">No Omada onboarding requests yet. Ask a business to create an Omada router and submit its setup form.</div>
+  {% endfor %}
 </div>
-<div class="integration-notice important">
-  First create a business site in the central Omada controller. Copy its device Inform URL <strong>omadacId</strong>
-  and its separate <strong>Open API siteId</strong> from the read-only sites list. Reviewing this request does not adopt
-  the AP, change payment permissions, or activate internet.
-</div>
-<section class="panel">
-  <div class="table-wrap"><table class="data-table"><thead><tr>
-    <th>Business / router</th><th>Wi-Fi details</th><th>Connection request</th><th>Status</th><th>WorldLink review</th>
-  </tr></thead><tbody>
-    {% for item in records %}
-    <tr>
-      <td><strong>{{ item.router.company.name }}</strong><small class="cell-sub">{{ item.router.name }} · {{ item.router.location.name }}</small></td>
-      <td><strong>{{ item.ssid_name|default:'SSID not provided' }}</strong><small class="cell-sub mono">AP {{ item.ap_mac|default:'Not provided' }}</small><small class="cell-sub">Serial: {{ item.router.serial|default:'Not provided' }}</small>{% if item.connection_mode == 'VPN' %}<small class="cell-sub">Controller ID: {{ item.controller_id|default:'Not provided' }}</small>{% endif %}</td>
-      <td>{{ item.get_connection_mode_display }}<small class="cell-sub">{{ item.controller_origin|default:'URL not provided' }}</small>
-        {% if item.setup_notes %}<small class="cell-sub">Customer note: {{ item.setup_notes|truncatechars:180 }}</small>{% endif %}</td>
-      <td><span class="pill pending">{{ item.get_status_display }}</span><small class="cell-sub">{{ item.updated_at|date:'d M Y H:i' }}</small>
-        {% if item.managed_site %}<small class="cell-sub">Central site: {{ item.managed_site.name }}</small>{% endif %}
-        {% if item.review_note %}<small class="cell-sub">Staff note: {{ item.review_note }}</small>{% endif %}</td>
-      <td>
-        {% if can_manage_platform and item.status == 'SUBMITTED' %}
-        <form method="post" action="{% url 'controlcenter:review_router_onboarding' item.pk %}" class="router-review-form">{% csrf_token %}
-          <label for="review-note-{{ item.pk }}">Response (no passwords)</label>
-          <input id="review-note-{{ item.pk }}" class="input" type="text" name="note" maxlength="400" placeholder="Optional if reviewed">
-          {% if item.connection_mode == 'CENTRAL' %}
-          <label for="site-name-{{ item.pk }}">Central Omada site name</label>
-          <input id="site-name-{{ item.pk }}" class="input" type="text" name="site_name" maxlength="120" placeholder="e.g. Customer · Main site">
-          <label for="inform-{{ item.pk }}">Site Inform URL omadacId</label>
-          <input id="inform-{{ item.pk }}" class="input mono" type="text" name="inform_site_id" maxlength="80" placeholder="Hex ID from Omada Inform URL">
-          <label for="api-site-{{ item.pk }}">Open API siteId</label>
-          <input id="api-site-{{ item.pk }}" class="input mono" type="text" name="openapi_site_id" maxlength="80" placeholder="From python manage.py list_omada_sites">
-          {% endif %}
-          <div class="row-actions"><button type="submit" class="action-button" name="decision" value="needs_info">Request details</button>
-          <button type="submit" class="action-button" name="decision" value="reviewed">Approve site details</button></div>
-        </form>
-        {% else %}—{% endif %}
-      </td>
-    </tr>
-    {% empty %}<tr><td class="empty-cell" colspan="5">No Omada onboarding requests yet.</td></tr>{% endfor %}
-  </tbody></table></div>
-</section>
 {% if records.has_other_pages %}<div class="pagination">
   {% if records.has_previous %}<a class="button button-secondary" href="?page={{ records.previous_page_number }}">← Previous</a>{% endif %}
   <span>Page {{ records.number }} of {{ records.paginator.num_pages }}</span>

@@ -40,6 +40,8 @@ def build_breadcrumbs(request):
     elif namespace == 'controlcenter':
         trail=[('WorldLink Control Center','controlcenter:overview' if name!='overview' else None)]
         section_map = {
+            'router_onboardings': ('Router onboarding', 'controlcenter:router_onboardings'),
+            'router_onboarding_detail': ('Router onboarding', 'controlcenter:router_onboardings'),
             'businesses':('All businesses','controlcenter:businesses'),
             'business_create':('Create a business',None),
             'business_detail':('All businesses','controlcenter:businesses'),
@@ -66,6 +68,8 @@ def build_breadcrumbs(request):
             trail.append((label, url if name not in ('businesses','users','team') else None))
         if name in ('business_detail','business_update','business_invite_owner','business_add_member'):
             trail.append(('Business details' if name!='business_invite_owner' else 'Invite owner',None))
+        if name == 'router_onboarding_detail':
+            trail.append(('Review AP and payments', None))
         if name in ('user_detail','user_access_update','staff_detail','staff_update'):
             trail.append(('Account details',None))
         if name=='staff_invite': trail.append(('Invite staff',None))
@@ -128,6 +132,7 @@ def build_breadcrumbs(request):
 
 def shell_context(request):
     membership=active_membership(request)
+    from payments.collections import collection_enabled_for
     resolver=getattr(request,'resolver_match',None)
     platform_area=bool(resolver and (resolver.namespace == 'controlcenter' or (
         resolver.namespace == 'wallets' and resolver.url_name in
@@ -139,8 +144,7 @@ def shell_context(request):
         'breadcrumbs':build_breadcrumbs(request) if request.user.is_authenticated else [],
         'active_company':membership.company if membership else None,
         'evpay_pilot_available': bool(membership and settings.EVPAY_ENABLED and settings.EVPAY_COMPANY_ID == membership.company_id),
-        'omada_paid_pilot_enabled': bool(membership and settings.OMADA_LIVE_ENABLED
-                                         and settings.OMADA_PILOT_COMPANY_ID == membership.company_id),
+        'omada_paid_pilot_enabled': bool(membership and collection_enabled_for(membership.company)),
         'ui_lang':request.session.get('ui_lang','en'),
         'allow_signup':settings.ALLOW_PUBLIC_SIGNUP,
         'platform_brand':PlatformBranding.objects.first(),

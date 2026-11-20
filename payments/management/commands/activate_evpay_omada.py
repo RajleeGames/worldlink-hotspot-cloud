@@ -1,4 +1,4 @@
-"""Run on the VPS every 15-30 seconds while the controller VPN is connected."""
+"""Authorize confirmed collections using the allowlisted central Omada API."""
 import time
 from datetime import timedelta
 
@@ -14,7 +14,7 @@ from payments.omada import authorize_paid_collection, OmadaError
 
 
 class Command(BaseCommand):
-    help = 'Authorize provider-confirmed WorldLink Wi-Fi purchases via private Omada API.'
+    help = 'Authorize provider-confirmed WorldLink Wi-Fi purchases via the trusted Omada API.'
 
     def add_arguments(self, parser):
         parser.add_argument('--limit', type=int, default=10)
@@ -39,10 +39,14 @@ class Command(BaseCommand):
         now = timezone.now()
         old_claim = now - timedelta(minutes=3)
         rows = EvPayCollection.objects.filter(
-            company_id=settings.OMADA_PILOT_COMPANY_ID,
-            status__in=EARNING_STATUSES, omada_activated_at__isnull=True,
-        ).filter(Q(omada_claimed_at__isnull=True) | Q(omada_claimed_at__lt=old_claim))
-        for pk in rows.order_by('confirmed_at').values_list('pk', flat=True)[:max(0, min(limit, 50))]:
+            company_id__in=settings.EVPAY_COLLECTION_COMPANY_IDS,
+            status__in=EARNING_STATUSES, confirmed_at__isnull=False,
+            omada_activated_at__isnull=True,
+        ).exclude(omada_last_error__startswith='Paid package expired').filter(
+            Q(omada_claimed_at__isnull=True) | Q(omada_claimed_at__lt=old_claim))
+        # Prioritize newly confirmed purchases over expired or stalled older rows.
+        # An expired payment must not starve unrelated new tenants' activations.
+        for pk in rows.order_by('-confirmed_at').values_list('pk', flat=True)[:max(0, min(limit, 50))]:
             claimed = EvPayCollection.objects.filter(pk=pk, omada_activated_at__isnull=True).filter(
                 Q(omada_claimed_at__isnull=True) | Q(omada_claimed_at__lt=old_claim)).update(omada_claimed_at=now)
             if not claimed:

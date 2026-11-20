@@ -88,6 +88,11 @@ def home(request):
 @require_tenant()
 def dashboard(request):
     company=request.active_company
+    from wallets.models import BusinessWallet, SettledCollection
+    from payments.models import EvPayCollection
+    verified_payments = EvPayCollection.objects.filter(company=company, status__in=EARNING_STATUSES)
+    cleared_refs = SettledCollection.objects.filter(wallet__company=company).values('source_reference')
+    wallet = BusinessWallet.objects.filter(company=company).first()
     routers = Router.objects.filter(company=company)
     observations = OmadaDeviceObservation.objects.filter(router__company=company).select_related(
         'router', 'router__omada_onboarding__managed_site',
@@ -115,8 +120,12 @@ def dashboard(request):
         'ready_count':Voucher.objects.filter(company=company,status=Voucher.Status.READY).count(),
         'sold_count':Voucher.objects.filter(company=company,status=Voucher.Status.SOLD).count(),
         'total_sales':ManualSale.objects.filter(company=company).aggregate(total=Sum('amount'))['total'] or 0,
-        'evpay_confirmed_total':EvPayCollection.objects.filter(company=company, status__in=EARNING_STATUSES).aggregate(total=Sum('amount'))['total'] or 0,
-        'evpay_confirmed_count':EvPayCollection.objects.filter(company=company, status__in=EARNING_STATUSES).count(),
+        'evpay_confirmed_total':verified_payments.aggregate(total=Sum('amount'))['total'] or 0,
+        'evpay_confirmed_count':verified_payments.count(),
+        'evpay_awaiting_clearance':verified_payments.exclude(reference__in=cleared_refs).aggregate(total=Sum('amount'))['total'] or 0,
+        'wallet_available':wallet.available if wallet else 0,
+        'wallet_reserved':wallet.reserved if wallet else 0,
+        'recent_evpay':EvPayCollection.objects.filter(company=company).select_related('plan')[:6],
         'total_expenses':Expense.objects.filter(company=company).aggregate(total=Sum('amount'))['total'] or 0,
         'recent_sales':ManualSale.objects.filter(company=company).select_related('voucher__batch__plan','recorded_by')[:6],
         'recent_routers':routers.select_related('location', 'omada_onboarding__managed_site', 'omada_observation')[:5],

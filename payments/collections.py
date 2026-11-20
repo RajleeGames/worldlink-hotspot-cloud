@@ -22,13 +22,53 @@ TERMINAL = {'FAILED', 'REFUNDED', 'REVERSED'}
 OPERATORS = {value for value, _ in EvPayCollection._meta.get_field('operator').choices}
 
 
+def live_central_routes(company_id):
+    """Only staff-approved central APs for the exact tenant may take live sales.
+
+    Router onboarding and an online observation alone NEVER enable charges.
+    The operator must also opt in globally and allowlist the company.
+    """
+    from networks.models import OmadaOnboarding
+    if (not settings.EVPAY_MULTITENANT_ENABLED or not settings.OMADA_LIVE_ENABLED
+            or company_id not in settings.EVPAY_COLLECTION_COMPANY_IDS):
+        return OmadaOnboarding.objects.none()
+    return OmadaOnboarding.objects.filter(
+        router__company_id=company_id, router__family='OMADA',
+        connection_mode=OmadaOnboarding.ConnectionMode.CENTRAL,
+        status=OmadaOnboarding.Status.REVIEWED, reviewed_by__isnull=False,
+        managed_site__company_id=company_id, managed_site__openapi_site_id__gt='',
+        live_payments_approved_at__isnull=False, live_payments_approved_by__isnull=False,
+    )
+
+
+def approved_payment_route(company_id, ap_mac, ssid):
+    """Authorize only the AP/SSID owned by this business, never URL-supplied sites."""
+    from .omada import normalize_mac
+    try:
+        mac = normalize_mac(ap_mac)
+    except ValueError:
+        return False
+    if (settings.OMADA_LIVE_ENABLED and company_id == settings.OMADA_PILOT_COMPANY_ID
+            and settings.OMADA_AP_MAC and settings.OMADA_SSID):
+        try:
+            if normalize_mac(settings.OMADA_AP_MAC) == mac and ssid == settings.OMADA_SSID:
+                return True
+        except ValueError:
+            pass
+    return bool(ssid and live_central_routes(company_id).filter(
+        ap_mac__iexact=mac, ssid_name=ssid,
+    ).exists())
+
+
 def collection_enabled_for(company):
     ready = bool(settings.EVPAY_ENABLED and settings.EVPAY_PUBLIC_CHECKOUT_ENABLED
         and company.pk in settings.EVPAY_COLLECTION_COMPANY_IDS
-        and settings.OMADA_LIVE_ENABLED and company.pk == settings.OMADA_PILOT_COMPANY_ID
+        and settings.OMADA_LIVE_ENABLED
         and all((settings.OMADA_CONTROLLER_URL, settings.OMADA_CONTROLLER_ID,
-                 settings.OMADA_OPERATOR_NAME, settings.OMADA_OPERATOR_PASSWORD,
-                 settings.OMADA_AP_MAC, settings.OMADA_SSID))
+                 settings.OMADA_OPERATOR_NAME, settings.OMADA_OPERATOR_PASSWORD))
+        and ((company.pk == settings.OMADA_PILOT_COMPANY_ID
+              and bool(settings.OMADA_AP_MAC and settings.OMADA_SSID))
+             or (company.status == 'ACTIVE' and live_central_routes(company.pk).exists()))
         and settings.EVPAY_COLLECTION_WEBHOOK_TOKEN
         and (settings.EVPAY_ENVIRONMENT != 'live' or settings.WHC_REDIS_URL))
     if not ready:
@@ -52,7 +92,8 @@ def start_collection(*, company, plan, name, phone, operator, nonce, omada_conte
         raise ValueError('This package is outside the approved live payment limit.')
     if not 2 <= len(name.strip()) <= 90:
         raise ValueError('Enter the customer name.')
-    if not omada_context or omada_context.get('ssidName') != settings.OMADA_SSID:
+    if not omada_context or not approved_payment_route(
+            company.pk, omada_context.get('apMac'), omada_context.get('ssidName')):
         raise ValueError('Connect to the WorldLink Wi-Fi first to purchase this package.')
     captured_at = omada_context.get('capturedAt')
     if not isinstance(captured_at, int) or not 0 <= time.time() - captured_at <= 600:

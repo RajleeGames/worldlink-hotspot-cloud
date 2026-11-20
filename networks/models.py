@@ -83,8 +83,8 @@ class OmadaManagedSite(models.Model):
 class OmadaOnboarding(models.Model):
     """Per-router setup request. Never grants access to a controller by itself.
 
-    Credentials are deliberately not stored here. Only the already-approved
-    single-company pilot in payments.omada can authorize paid clients.
+    Credentials are deliberately not stored here. Independent, staff-only
+    financial approval is required before a new business can sell live access.
     """
 
     class Status(models.TextChoices):
@@ -114,6 +114,12 @@ class OmadaOnboarding(models.Model):
     reviewed_at = models.DateTimeField(null=True, blank=True)
     reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     review_note = models.CharField(max_length=400, blank=True)
+    live_payments_approved_at = models.DateTimeField(null=True, blank=True)
+    live_payments_approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+        related_name='approved_omada_live_payment_routers',
+    )
+    live_payments_note = models.CharField(max_length=400, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
