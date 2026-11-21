@@ -2,6 +2,7 @@
 import json
 import re
 import secrets
+from math import ceil
 
 from django.conf import settings
 from django.contrib import messages
@@ -22,7 +23,7 @@ from .evpay import normalize_msisdn, ensure_settings_ready, EvPayError, verify_w
 from .evpay_lab import EVENT_STATUSES
 from .models import PlatformSubscriptionPayment
 from .platform_subscription import (PRICE, OPEN, active_subscription,
-    apply_subscription_status, charge_subscription, retrieve_and_apply_subscription)
+    apply_subscription_status, charge_subscription, retrieve_and_apply_subscription, subscription_expiry)
 
 
 def _membership(request):
@@ -32,15 +33,33 @@ def _membership(request):
     return member
 
 
+def subscription_view_data(company, *, has_paid=False):
+    now = timezone.now()
+    expires = subscription_expiry(company)
+    future = bool(expires and expires > now)
+    days = max(0, ceil((expires - now).total_seconds() / 86400)) if expires else None
+    if future and has_paid:
+        status = 'expiring' if days <= 7 else 'active'
+    elif not has_paid and not getattr(settings, 'WORLDLINK_SUBSCRIPTIONS_ENFORCED', False):
+        status = 'grace'
+    else:
+        status = 'expired'
+    return {'expires_at':expires, 'expiry_future':future,
+            'expiry_passed': bool(expires and not future), 'days_remaining': days,
+            'subscription_status':status}
+
+
 @login_required
 def subscription_dashboard(request):
     m = _membership(request)
     history = PlatformSubscriptionPayment.objects.filter(company=m.company).order_by('-created_at')[:15]
     pending = PlatformSubscriptionPayment.objects.filter(
         company=m.company, status__in=OPEN).order_by('-created_at').first()
+    has_paid = PlatformSubscriptionPayment.objects.filter(company=m.company, applied_at__isnull=False).exists()
     response = render(request, 'payments/subscription_dashboard.html', {
         'page_title': 'Monthly subscription', 'company': m.company,
-        'price': PRICE, 'history': history, 'pending': pending,
+        'price': PRICE, 'fee_display': f'{PRICE:,.0f}', 'history': history, 'pending': pending,
+        **subscription_view_data(m.company, has_paid=has_paid),
         'can_pay': m.role in ('OWNER','MANAGER'),
         'can_use': active_subscription(m.company),
         'billing_enabled': getattr(settings, 'WORLDLINK_SUBSCRIPTIONS_ENABLED', False),
@@ -123,7 +142,8 @@ def subscription_state(request, pk):
     m = _membership(request)
     p = get_object_or_404(PlatformSubscriptionPayment, pk=pk, company=m.company)
     response = JsonResponse({'status':p.status, 'confirmed':bool(p.applied_at),
-        'expires':p.period_ends.isoformat() if p.period_ends else None})
+        'expires':p.period_ends.isoformat() if p.period_ends else None,
+        'expires_at':p.period_expires_at.isoformat() if p.period_expires_at else None})
     response['Cache-Control'] = 'no-store'
     return response
 
@@ -169,9 +189,19 @@ def subscription_webhook(request, token):
 @platform_required()
 def platform_subscriptions(request):
     qs = PlatformSubscriptionPayment.objects.select_related('company').order_by('-created_at')
+    paid_company_ids = set(PlatformSubscriptionPayment.objects.filter(
+        applied_at__isnull=False).values_list('company_id', flat=True))
+    business_rows = []
+    for company in Company.objects.order_by('name', 'id'):
+        info = subscription_view_data(company, has_paid=company.pk in paid_company_ids)
+        business_rows.append({'company':company, 'status':info['subscription_status'],
+                              'expires_at':info['expires_at'], 'days_left':info['days_remaining'],
+                              'future':info['expiry_future']})
     return render(request,'payments/platform_subscriptions.html',{
-        'page_title':'WorldLink subscriptions',
-        'payments':qs[:200],
+        'page_title':'WorldLink subscriptions', 'payments':qs[:200],
         'total_confirmed':qs.filter(status__in=['SUCCESS','SETTLED']).count(),
-        'business_count':Company.objects.count(),
+        'business_count':len(business_rows), 'business_rows':business_rows,
+        'active_count':sum(r['status']=='active' for r in business_rows),
+        'expiring_count':sum(r['status']=='expiring' for r in business_rows),
+        'unpaid_count':sum(r['status'] in ('expired','grace') for r in business_rows),
     })

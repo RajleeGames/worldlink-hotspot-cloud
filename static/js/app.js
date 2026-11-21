@@ -118,7 +118,7 @@
   };
   document.querySelectorAll('select.language-select, select#company_id, select.input').forEach((select, selectIndex) => {
     const wrap = select.closest('.select-wrap');
-    if (!wrap || select.multiple || select.options.length < 1 || select.options.length > 80) return;
+    if (!wrap || select.hasAttribute('data-native-select') || select.multiple || select.options.length < 1 || select.options.length > 80) return;
     wrap.classList.add('is-enhanced');
     select.tabIndex = -1;
     select.setAttribute('aria-hidden', 'true');
@@ -242,6 +242,7 @@
     }));
     document.querySelectorAll('form').forEach(form => form.addEventListener('submit', () => {
       if (!form.checkValidity()) return;
+      if (form.matches('.wlsub-checkout-form')) return;
       if (form.matches('[data-upload-progress]') && [...form.querySelectorAll('input[type="file"]')].some(el => el.files?.length)) return;
       showLoader();
     }));

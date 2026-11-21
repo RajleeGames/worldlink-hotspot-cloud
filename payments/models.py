@@ -222,6 +222,8 @@ class PlatformSubscriptionPayment(models.Model):
     applied_at = models.DateTimeField(null=True, blank=True)
     period_starts = models.DateField(null=True, blank=True)
     period_ends = models.DateField(null=True, blank=True)
+    period_started_at = models.DateTimeField(null=True, blank=True)
+    period_expires_at = models.DateTimeField(null=True, blank=True)
     last_checked_at = models.DateTimeField(null=True, blank=True)
     last_error = models.CharField(max_length=250, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

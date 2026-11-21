@@ -74,6 +74,10 @@ def build_breadcrumbs(request):
             trail.append(('Account details',None))
         if name=='staff_invite': trail.append(('Invite staff',None))
         if name=='invitation_created': trail.append(('Invitation link',None))
+    elif namespace == 'payments' and name in ('subscription_dashboard', 'subscription_start', 'subscription_status', 'subscription_state'):
+        trail.append(('Monthly subscription', None))
+    elif namespace == 'payments' and name == 'platform_subscriptions':
+        trail = [('WorldLink Control Center', 'controlcenter:overview'), ('Platform subscriptions', None)]
     elif namespace == 'payments':
         if name in ('evpay_lab','evpay_auth','evpay_start','evpay_reconcile'):
             trail = [('WorldLink Control Center','controlcenter:overview')]

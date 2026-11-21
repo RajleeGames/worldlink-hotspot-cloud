@@ -17,6 +17,7 @@ class Company(models.Model):
     city = models.CharField(max_length=100, blank=True)
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.TRIAL)
     subscription_ends = models.DateField(null=True, blank=True)
+    subscription_expires_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

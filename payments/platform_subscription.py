@@ -5,7 +5,7 @@ Only a verified signed webhook or authenticated status retrieval can extend acce
 """
 import calendar
 import re
-from datetime import date
+from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
@@ -23,17 +23,34 @@ ALLOWED = {'PENDING', 'PROCESSING', 'ON-HOLD', 'SUCCESS', 'SETTLED',
 OPEN = {'CREATED', 'UNKNOWN', 'PENDING', 'PROCESSING', 'ON-HOLD'}
 
 
+def subscription_expiry(company):
+    """Exact expiry first; legacy date-only grace ends at the local day's end."""
+    expiry = getattr(company, 'subscription_expires_at', None)
+    if expiry is not None:
+        return expiry
+    end_date = company.subscription_ends
+    if end_date is None:
+        return None
+    return timezone.make_aware(datetime.combine(end_date, time(23, 59, 59)), timezone.get_default_timezone())
+
+
 def active_subscription(company, today=None):
     if not getattr(settings, 'WORLDLINK_SUBSCRIPTIONS_ENFORCED', False):
         return True
-    today = today or timezone.localdate()
-    return bool(company.subscription_ends and company.subscription_ends >= today)
+    expiry = subscription_expiry(company)
+    return bool(expiry and expiry > timezone.now())
 
 
 def next_month(day):
     year = day.year + (day.month // 12)
     month = (day.month % 12) + 1
     return date(year, month, min(day.day, calendar.monthrange(year, month)[1]))
+
+
+def next_month_datetime(moment):
+    """Same Tanzania local clock time, one calendar month later."""
+    local = timezone.localtime(moment, timezone.get_default_timezone())
+    return datetime.combine(next_month(local.date()), local.timetz(), local.tzinfo)
 
 
 def subscription_callback_url():
@@ -103,15 +120,20 @@ def apply_subscription_status(*, reference, status, amount, currency,
                 fields.append('fsp_reference')
             if status in EARNING and not payment.applied_at:
                 company = payment.company.__class__.objects.select_for_update().get(pk=payment.company_id)
-                today = timezone.localdate()
-                starting = max(today, company.subscription_ends or today)
-                ending = next_month(starting)
-                company.subscription_ends = ending
-                company.save(update_fields=['subscription_ends'])
-                payment.period_starts, payment.period_ends = starting, ending
-                payment.confirmed_at = timezone.now()
-                payment.applied_at = timezone.now()
-                fields += ['period_starts','period_ends','confirmed_at','applied_at']
+                now = timezone.now()
+                current_expiry = subscription_expiry(company)
+                starting = max(now, current_expiry) if current_expiry else now
+                ending = next_month_datetime(starting)
+                company.subscription_expires_at = ending
+                company.subscription_ends = timezone.localtime(ending).date()
+                company.save(update_fields=['subscription_expires_at', 'subscription_ends'])
+                payment.period_started_at, payment.period_expires_at = starting, ending
+                payment.period_starts = timezone.localtime(starting).date()
+                payment.period_ends = timezone.localtime(ending).date()
+                payment.confirmed_at = now
+                payment.applied_at = now
+                fields += ['period_started_at', 'period_expires_at', 'period_starts',
+                           'period_ends', 'confirmed_at', 'applied_at']
                 applied = True
             # A reversal is retained for WorldLink refund/revocation review;
             # do not erase later paid periods or silently charge a second time.
