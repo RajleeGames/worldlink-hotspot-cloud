@@ -75,6 +75,11 @@ def approved_payment_route(company_id, ap_mac, ssid):
 
 
 def collection_enabled_for(company):
+    # Never initiate a NEW Wi-Fi charge for an expired platform subscription.
+    # Previously confirmed payments are still reconciled/activated normally.
+    from .platform_subscription import active_subscription
+    if not active_subscription(company):
+        return False
     ready = bool(settings.EVPAY_ENABLED and settings.EVPAY_PUBLIC_CHECKOUT_ENABLED
         and company_collection_allowed(company.pk)
         and settings.OMADA_LIVE_ENABLED

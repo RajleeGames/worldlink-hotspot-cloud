@@ -1,0 +1,16 @@
+[Unit]
+Description=WorldLink EvPay Subscription Reconciliation (read-only)
+After=network-online.target worldlink-hotspot.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=miraji
+WorkingDirectory=/var/www/worldlink-hotspot-cloud
+ExecStart=/var/www/worldlink-hotspot-cloud/.venv/bin/python manage.py reconcile_evpay_subscriptions --loop --interval 20 --limit 25
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

@@ -139,7 +139,7 @@ def shell_context(request):
     platform_area=bool(resolver and (
         resolver.namespace == 'controlcenter'
         or (resolver.namespace == 'payments' and resolver.url_name in
-            ('evpay_lab','evpay_auth','evpay_start','evpay_reconcile'))
+            ('evpay_lab','evpay_auth','evpay_start','evpay_reconcile','platform_subscriptions'))
         or (resolver.namespace == 'wallets' and resolver.url_name in
             ('queue','destination_review','withdrawal_detail','withdrawal_review','collection_new'))
     ))

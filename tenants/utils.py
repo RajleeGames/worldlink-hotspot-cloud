@@ -25,6 +25,10 @@ def require_tenant(*roles):
                 raise PermissionDenied('Business account is suspended.')
             if roles and membership.role not in roles:
                 raise PermissionDenied('Your role does not allow this action.')
+            # Preserve public captive sessions; gate only business management.
+            from payments.platform_subscription import active_subscription
+            if not active_subscription(membership.company):
+                return redirect('payments:subscription_dashboard')
             request.active_membership = membership
             request.active_company = membership.company
             return func(request, *args, **kwargs)

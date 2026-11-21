@@ -1,0 +1,13 @@
+{% extends 'base.html' %}{% block content %}
+<div class="page-heading"><div><p class="eyebrow">WORLDLINK</p><h1>{% if ui_lang == 'sw' %}Hali ya malipo ya usajili{% else %}Subscription payment status{% endif %}</h1></div></div>
+<section class="panel" style="max-width:700px;padding:24px">
+<p>{% if ui_lang == 'sw' %}Kumbukumbu{% else %}Reference{% endif %}: <strong>{{ payment.reference }}</strong></p>
+<p>{% if ui_lang == 'sw' %}Kiasi{% else %}Amount{% endif %}: <strong>TZS {{ payment.amount|floatformat:0 }}</strong></p>
+<p>{% if ui_lang == 'sw' %}Hali{% else %}Status{% endif %}: <strong id="subscription-state">{{ payment.get_status_display }}</strong></p>
+<p id="subscription-result">{% if payment.applied_at %}{% if ui_lang == 'sw' %}Usajili umeongezwa hadi{% else %}Subscription extended through{% endif %} {{ payment.period_ends|date:'d M Y' }}{% elif payment.status == 'FAILED' %}{% if ui_lang == 'sw' %}Malipo hayakufaulu{% else %}Payment failed{% endif %}{% else %}{% if ui_lang == 'sw' %}Tunaangalia uthibitisho. Usilipe tena kwa sasa.{% else %}Checking provider confirmation. Do not pay twice.{% endif %}{% endif %}</p>
+<p><a href="{% url 'payments:subscription_dashboard' %}" class="button button-secondary">{% if ui_lang == 'sw' %}Rudi kwenye usajili{% else %}Back to subscriptions{% endif %}</a></p>
+</section>
+<script>
+(function(){var s=document.getElementById('subscription-state'),r=document.getElementById('subscription-result');var url='{% url "payments:subscription_state" payment.pk %}';var i=0;function check(){if(i++>180)return;fetch(url,{credentials:'same-origin',cache:'no-store'}).then(function(x){if(!x.ok)throw new Error('network');return x.json()}).then(function(d){s.textContent=d.status;if(d.confirmed){r.textContent='{% if ui_lang == "sw" %}Usajili umelipiwa hadi {% else %}Subscription paid through {% endif %}'+(d.expires||'');return;}if(['FAILED','REFUNDED','REVERSED'].includes(d.status)){r.textContent='{% if ui_lang == "sw" %}Malipo hayakufaulu. Wasiliana na WorldLink.{% else %}Payment was not successful. Contact WorldLink support.{% endif %}';return;}setTimeout(check,7000)}).catch(function(){setTimeout(check,15000)})}check()})();
+</script>
+{% endblock %}

@@ -188,3 +188,53 @@ class EvPayCompanyAuthorization(models.Model):
 
     def __str__(self):
         return f'{self.company} · {"authorized" if self.enabled else "blocked"}'
+
+
+# WorldLink platform subscriptions are separate from Wi-Fi business collection wallets.
+from decimal import Decimal
+
+
+class PlatformSubscriptionPayment(models.Model):
+    class Status(models.TextChoices):
+        CREATED = 'CREATED', 'Created'
+        UNKNOWN = 'UNKNOWN', 'Checking payment'
+        PENDING = 'PENDING', 'Pending'
+        PROCESSING = 'PROCESSING', 'Processing'
+        ON_HOLD = 'ON-HOLD', 'On hold'
+        SUCCESS = 'SUCCESS', 'Paid'
+        SETTLED = 'SETTLED', 'Settled'
+        FAILED = 'FAILED', 'Failed'
+        REFUNDED = 'REFUNDED', 'Refunded'
+        REVERSED = 'REVERSED', 'Reversed'
+
+    company = models.ForeignKey(Company, on_delete=models.PROTECT, related_name='platform_subscriptions')
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    reference = models.CharField(max_length=40, unique=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('20000.00'))
+    currency = models.CharField(max_length=3, default='TZS')
+    phone = models.CharField(max_length=15)
+    operator = models.CharField(max_length=20, choices=EvPayTestPayment.OPERATOR_CHOICES)
+    environment = models.CharField(max_length=10)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.CREATED)
+    transaction_id = models.CharField(max_length=100, blank=True)
+    fsp_reference = models.CharField(max_length=100, blank=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    applied_at = models.DateTimeField(null=True, blank=True)
+    period_starts = models.DateField(null=True, blank=True)
+    period_ends = models.DateField(null=True, blank=True)
+    last_checked_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=250, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [models.UniqueConstraint(fields=['transaction_id'],
+                        condition=~models.Q(transaction_id=''), name='wlsubs_unique_provider_txn')]
+
+
+class PlatformSubscriptionDelivery(models.Model):
+    payment = models.ForeignKey(PlatformSubscriptionPayment, on_delete=models.PROTECT, related_name='deliveries')
+    delivery_id = models.CharField(max_length=100, unique=True)
+    event = models.CharField(max_length=40)
+    status = models.CharField(max_length=12)
+    received_at = models.DateTimeField(auto_now_add=True)

@@ -15,5 +15,6 @@
     </div>
   </form>
   <div class="settings-meta"><div class="setting-strip"><span>{% t 'Account status' %}</span><strong class="pill">{{ active_company.get_status_display }}</strong></div><div class="setting-strip"><span>{% t 'Subscription' %}</span><strong>{{ active_company.subscription_ends|date:'d M Y'|default:'Not configured' }}</strong></div></div>
+<p style="padding:0 24px 24px"><a class="button button-secondary" href="{% url 'payments:subscription_dashboard' %}">{% if ui_lang == 'sw' %}Usajili wa mwezi{% else %}Manage monthly subscription{% endif %}</a></p>
 </section>
 {% endblock %}

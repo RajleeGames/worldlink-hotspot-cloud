@@ -1,6 +1,12 @@
 from django.urls import path
-from . import views, evpay_views, collection_views
+from . import views, evpay_views, collection_views, subscription_views
 urlpatterns = [
+    path('subscriptions/', subscription_views.subscription_dashboard, name='subscription_dashboard'),
+    path('subscriptions/pay/', subscription_views.subscription_start, name='subscription_start'),
+    path('subscriptions/payment/<int:pk>/', subscription_views.subscription_status, name='subscription_status'),
+    path('subscriptions/payment/<int:pk>/state/', subscription_views.subscription_state, name='subscription_state'),
+    path('subscriptions/webhook/<slug:token>/', subscription_views.subscription_webhook, name='subscription_webhook'),
+    path('subscriptions/platform/', subscription_views.platform_subscriptions, name='platform_subscriptions'),
     path('', views.orders, name='orders'),
     path('evpay/', evpay_views.lab, name='evpay_lab'),
     path('evpay/auth/', evpay_views.test_auth, name='evpay_auth'),
