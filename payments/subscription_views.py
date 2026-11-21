@@ -2,6 +2,7 @@
 import json
 import re
 import secrets
+from decimal import Decimal, InvalidOperation
 from math import ceil
 
 from django.conf import settings
@@ -23,7 +24,8 @@ from .evpay import normalize_msisdn, ensure_settings_ready, EvPayError, verify_w
 from .evpay_lab import EVENT_STATUSES
 from .models import PlatformSubscriptionPayment
 from .platform_subscription import (PRICE, OPEN, active_subscription,
-    apply_subscription_status, charge_subscription, retrieve_and_apply_subscription, subscription_expiry)
+    apply_subscription_status, charge_subscription, retrieve_and_apply_subscription,
+    subscription_expiry, evpay_failure_code)
 
 
 def _membership(request):
@@ -110,7 +112,30 @@ def subscription_start(request):
     # A failed/ambiguous network response is NOT permission to resend a charge.
     try:
         data = charge_subscription(payment)
-        payment.status = 'PENDING' if data.get('status') not in ('PROCESSING',) else 'PROCESSING'
+        reported_status = str(data.get('status') or '').upper()
+        # Some MNO rejections are reported synchronously before a USSD prompt.
+        # The TLS-authenticated EvPay response is authoritative for a FAILED
+        # outcome only after checking any supplied reference/amount/currency.
+        provider_ref = (data.get('orderReference') or data.get('customReference')
+                        or data.get('requestId') or data.get('reference'))
+        if provider_ref and provider_ref != payment.reference:
+            raise EvPayError('EvPay returned a mismatched payment reference.')
+        if data.get('amount') is not None:
+            try:
+                amount_matches = Decimal(str(data['amount'])) == PRICE
+            except (InvalidOperation, TypeError, ValueError):
+                amount_matches = False
+            if not amount_matches:
+                raise EvPayError('EvPay returned a mismatched payment amount.')
+        if data.get('currency') is not None and data['currency'] != 'TZS':
+            raise EvPayError('EvPay returned a mismatched currency.')
+        if reported_status == 'FAILED':
+            payment.status = 'FAILED'
+            payment.last_error = 'EVPAY_FAILURE:' + evpay_failure_code(data.get('failureReason'))
+        else:
+            # Never activate access on the initiation response alone; wait for
+            # signed webhook or read-only status reconciliation.
+            payment.status = 'PROCESSING' if reported_status == 'PROCESSING' else 'PENDING'
     except EvPayError:
         payment.status = 'UNKNOWN'
         payment.last_error = 'Provider response uncertain. Checking the same reference.'
@@ -141,7 +166,10 @@ def subscription_status(request, pk):
 def subscription_state(request, pk):
     m = _membership(request)
     p = get_object_or_404(PlatformSubscriptionPayment, pk=pk, company=m.company)
+    reason_code = (p.last_error.removeprefix('EVPAY_FAILURE:')
+                   if p.status == 'FAILED' and p.last_error.startswith('EVPAY_FAILURE:') else '')
     response = JsonResponse({'status':p.status, 'confirmed':bool(p.applied_at),
+        'failure_code': reason_code,
         'expires':p.period_ends.isoformat() if p.period_ends else None,
         'expires_at':p.period_expires_at.isoformat() if p.period_expires_at else None})
     response['Cache-Control'] = 'no-store'
@@ -178,7 +206,8 @@ def subscription_webhook(request, token):
             amount=data['amount'], currency=data['currency'],
             transaction_id=data.get('id') or '',
             fsp_reference=data.get('fspReference') or '',
-            delivery_id=delivery_id, event=event)
+            delivery_id=delivery_id, event=event,
+            failure_reason=data.get('failureReason'))
     except (KeyError, ValueError, TypeError, LookupError, PlatformSubscriptionPayment.DoesNotExist):
         return JsonResponse({'error':'Invalid subscription event'}, status=400)
     response = JsonResponse({'status':'OK'})

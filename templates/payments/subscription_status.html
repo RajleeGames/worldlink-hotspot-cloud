@@ -1,8 +1,87 @@
 {% extends 'base.html' %}{% load static %}{% block content %}
 <link rel="stylesheet" href="{% static 'css/subscription_v2.css' %}?v={{ app_css_version }}">
 <div class="page-heading"><div><p class="eyebrow">WORLDLINK · {% if ui_lang == 'sw' %}MALIPO{% else %}PAYMENT{% endif %}</p><h1>{% if ui_lang == 'sw' %}Hali ya malipo ya usajili{% else %}Subscription payment status{% endif %}</h1></div></div>
-<section class="panel wlsub-status-page"><div class="wlsub-wait-icon"><span class="wlsub-spinner"></span></div><h2 id="subscription-state">{% include "payments/_subscription_status_label.html" with payment=payment %}</h2><p class="wlsub-ref">{{ payment.reference }}</p><p>{% if ui_lang == 'sw' %}Kiasi{% else %}Amount{% endif %}: <strong>TZS {{ payment.amount|floatformat:'0g' }}</strong></p><p id="subscription-result" role="status" aria-live="polite">{% if payment.applied_at %}{% if ui_lang == 'sw' %}Usajili umelipiwa hadi{% else %}Subscription active until{% endif %} {% if payment.period_expires_at %}{{ payment.period_expires_at|date:'d M Y, H:i' }} EAT{% else %}{{ payment.period_ends|date:'d M Y' }}{% endif %}{% elif payment.status == 'FAILED' %}{% if ui_lang == 'sw' %}Malipo hayakufaulu{% else %}Payment was not successful{% endif %}{% else %}{% if ui_lang == 'sw' %}Subiri uthibitisho wa EvPay. Usitume malipo mara mbili.{% else %}Waiting for EvPay confirmation. Do not send another payment.{% endif %}{% endif %}</p><a class="button button-secondary wlsub-action" href="{% url 'payments:subscription_dashboard' %}">{% if ui_lang == 'sw' %}Rudi kwenye usajili{% else %}Back to subscription{% endif %}</a></section>
+<section class="panel wlsub-status-page{% if payment.applied_at or payment.status == 'FAILED' or payment.status == 'REFUNDED' or payment.status == 'REVERSED' %} is-done{% endif %}">
+  <div class="wlsub-wait-icon"><span class="wlsub-spinner" aria-hidden="true"></span></div>
+  <h2 id="subscription-state">{% include "payments/_subscription_status_label.html" with payment=payment %}</h2>
+  <p class="wlsub-ref">{{ payment.reference }}</p>
+  <p>{% if ui_lang == 'sw' %}Kiasi{% else %}Amount{% endif %}: <strong>TZS {{ payment.amount|floatformat:'0g' }}</strong></p>
+  <p id="subscription-result" role="status" aria-live="polite">
+    {% if payment.applied_at %}
+      {% if ui_lang == 'sw' %}Usajili umelipiwa hadi{% else %}Subscription active until{% endif %}
+      {% if payment.period_expires_at %}{{ payment.period_expires_at|date:'d M Y, H:i' }} EAT{% else %}{{ payment.period_ends|date:'d M Y' }}{% endif %}
+    {% elif payment.status == 'FAILED' %}
+      {% if payment.last_error == 'EVPAY_FAILURE:CUSTOMER_CANCELLED' %}
+        {% if ui_lang == 'sw' %}Umeghairi malipo kwenye simu. Malipo hayakufanyika. Unaweza kujaribu tena.{% else %}You cancelled the payment on your phone. Payment failed. You may try again.{% endif %}
+      {% elif payment.last_error == 'EVPAY_FAILURE:CUSTOMER_TIMEOUT' %}
+        {% if ui_lang == 'sw' %}Muda wa uthibitisho umeisha. Malipo yameshindikana; jaribu tena.{% else %}The phone approval timed out. Payment failed; you can try again.{% endif %}
+      {% else %}
+        {% if ui_lang == 'sw' %}EvPay imethibitisha kuwa malipo yameshindikana. Unaweza kujaribu tena.{% else %}EvPay confirmed this payment failed. You can try again.{% endif %}
+      {% endif %}
+    {% elif payment.status == 'REFUNDED' or payment.status == 'REVERSED' %}
+      {% if ui_lang == 'sw' %}Malipo yamerudishwa au kutenguliwa. Tafadhali wasiliana na WorldLink.{% else %}Payment was refunded or reversed. Please contact WorldLink support.{% endif %}
+    {% elif payment.status == 'UNKNOWN' %}
+      {% if ui_lang == 'sw' %}EvPay haijapatikana kuthibitisha ombi hili. Haimaanishi malipo yameshindikana. Usilipe tena mpaka hali ihakikiwe.{% else %}EvPay could not verify this request. This does not mean it failed. Do not pay again until the status is confirmed.{% endif %}
+    {% else %}
+      {% if ui_lang == 'sw' %}Subiri uthibitisho wa EvPay. Usitume malipo mara mbili.{% else %}Waiting for EvPay confirmation. Do not send another payment.{% endif %}
+    {% endif %}
+  </p>
+  <a id="wlsubBackLink" class="button {% if payment.status == 'FAILED' %}button-primary{% else %}button-secondary{% endif %} wlsub-action" href="{% url 'payments:subscription_dashboard' %}">{% if payment.status == 'FAILED' %}{% if ui_lang == 'sw' %}Jaribu kulipa tena{% else %}Try payment again{% endif %}{% else %}{% if ui_lang == 'sw' %}Rudi kwenye usajili{% else %}Back to subscription{% endif %}{% endif %}</a>
+</section>
 <script>
-(function(){var s=document.getElementById('subscription-state'),r=document.getElementById('subscription-result'),box=document.querySelector('.wlsub-status-page');var url='{% url 'payments:subscription_state' payment.pk %}';var attempts=0,done=false;function check(){if(done||attempts++>=180)return;fetch(url,{credentials:'same-origin',cache:'no-store'}).then(function(res){if(!res.ok)throw Error('network');return res.json()}).then(function(d){s.textContent={% if ui_lang == 'sw' %}({'CREATED':'Imeanzishwa','UNKNOWN':'Inakaguliwa','PENDING':'Inasubiri uthibitisho','PROCESSING':'Inachakatwa','ON-HOLD':'Imesitishwa','SUCCESS':'Imelipwa','SETTLED':'Imekamilika EvPay','FAILED':'Imeshindikana','REFUNDED':'Imerejeshwa','REVERSED':'Imetenguliwa'})[d.status]||d.status{% else %}d.status{% endif %};if(d.confirmed){done=true;box.classList.add('is-done');var when=d.expires_at?new Date(d.expires_at).toLocaleString('en-TZ',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Africa/Dar_es_Salaam'}):(d.expires||'');r.textContent={% if ui_lang == 'sw' %}'Usajili umelipiwa hadi '{% else %}'Subscription active until '{% endif %}+when+' EAT';return;}if(['FAILED','REFUNDED','REVERSED'].includes(d.status)){done=true;box.classList.add('is-done');r.textContent={% if ui_lang == 'sw' %}'Malipo hayakufaulu. Wasiliana na WorldLink.'{% else %}'Payment was not successful. Contact WorldLink support.'{% endif %};return;}setTimeout(check,7000)}).catch(function(){setTimeout(check,15000)})}check()})();
+(function(){
+  var state=document.getElementById('subscription-state');
+  var message=document.getElementById('subscription-result');
+  var box=document.querySelector('.wlsub-status-page');
+  var back=document.getElementById('wlsubBackLink');
+  var url='{% url 'payments:subscription_state' payment.pk %}';
+  var sw={% if ui_lang == 'sw' %}true{% else %}false{% endif %};
+  var tries=0,done=false;
+  var stateLabels={
+    CREATED:sw?'Imeanzishwa':'Created',
+    UNKNOWN:sw?'Inasubiri uhakiki wa EvPay':'Verification unavailable',
+    PENDING:sw?'Inasubiri uthibitisho':'Pending',
+    PROCESSING:sw?'Inachakatwa':'Processing',
+    'ON-HOLD':sw?'Imesitishwa':'On hold',
+    SUCCESS:sw?'Imelipwa':'Paid', SETTLED:sw?'Imekamilika EvPay':'Settled',
+    FAILED:sw?'Imeshindikana':'Failed',
+    REFUNDED:sw?'Imerejeshwa':'Refunded', REVERSED:sw?'Imetenguliwa':'Reversed'
+  };
+  function check(){
+    if(done||tries++>=180)return;
+    fetch(url,{credentials:'same-origin',cache:'no-store'})
+    .then(function(res){if(!res.ok)throw Error('network');return res.json();})
+    .then(function(d){
+      var cancelled=d.status==='FAILED'&&d.failure_code==='CUSTOMER_CANCELLED';
+      var timedout=d.status==='FAILED'&&d.failure_code==='CUSTOMER_TIMEOUT';
+      state.textContent=cancelled?(sw?'Imeshindikana · Umeghairi malipo':'Failed · Customer cancelled'):
+        timedout?(sw?'Imeshindikana · Muda umeisha':'Failed · Timed out'):(stateLabels[d.status]||d.status);
+      if(d.confirmed){
+        done=true;box.classList.add('is-done');
+        var when=d.expires_at?new Date(d.expires_at).toLocaleString('en-TZ',{
+          day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Africa/Dar_es_Salaam'
+        }):(d.expires||'');
+        message.textContent=(sw?'Usajili umelipiwa hadi ':'Subscription active until ')+when+' EAT';return;
+      }
+      if(d.status==='FAILED'){
+        done=true;box.classList.add('is-done');
+        message.textContent=cancelled?(sw?'Umeghairi malipo kwenye simu. Unaweza kujaribu tena.':'Customer cancelled the phone prompt. You may try again.'):
+          timedout?(sw?'Muda wa malipo umeisha. Unaweza kujaribu tena.':'Phone approval timed out. You may try again.'):
+          (sw?'EvPay imethibitisha malipo yameshindikana. Unaweza kujaribu tena.':'EvPay confirmed payment failed. You may try again.');
+        back.textContent=sw?'Jaribu kulipa tena':'Try payment again';
+        back.classList.remove('button-secondary');back.classList.add('button-primary');return;
+      }
+      if(['REFUNDED','REVERSED'].includes(d.status)){
+        done=true;box.classList.add('is-done');
+        message.textContent=sw?'Malipo yamerudishwa au kutenguliwa. Wasiliana na WorldLink.':'Payment reversed or refunded. Contact WorldLink support.';return;
+      }
+      if(d.status==='UNKNOWN'){
+        message.textContent=sw?'EvPay haijapatikana kuthibitisha ombi hili. Haimaanishi malipo yameshindikana. Usilipe tena.':'EvPay could not verify this request. It may still complete. Do not pay again.';
+      }
+      setTimeout(check,7000);
+    }).catch(function(){setTimeout(check,15000);});
+  }
+  check();
+})();
 </script>
 {% endblock %}

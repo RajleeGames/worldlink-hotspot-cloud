@@ -1,6 +1,7 @@
 """Safe, no-network tests for WorldLink monthly billing UI and exact expiry."""
 from datetime import timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
@@ -85,3 +86,73 @@ class SubscriptionUIV2Tests(TestCase):
     def test_business_cannot_open_worldlink_staff_subscriptions(self):
         response = self.client.get(reverse('payments:platform_subscriptions'))
         self.assertEqual(response.status_code, 403)
+
+
+@override_settings(EVPAY_ENVIRONMENT='live', WORLDLINK_SUBSCRIPTIONS_ENABLED=True,
+                   WORLDLINK_SUBSCRIPTIONS_ENFORCED=False, EVPAY_ENABLED=True,
+                   EVPAY_PRODUCTION_CHARGES_ENABLED=True)
+class SubscriptionFailureStatusTests(TestCase):
+    def setUp(self):
+        self.company = Company.objects.create(name='Failure status test', status='ACTIVE')
+        self.owner = get_user_model().objects.create_user(
+            username='failure-status-owner', password='strong-test-pass')
+        Membership.objects.create(user=self.owner, company=self.company, role='OWNER')
+        self.client.force_login(self.owner)
+
+    def new_payment(self, status='UNKNOWN', reference='WLS-FAILED-TEST'):
+        return PlatformSubscriptionPayment.objects.create(
+            reference=reference, company=self.company, created_by=self.owner,
+            amount=Decimal('20000.00'), currency='TZS', phone='255712345678',
+            operator='Mpesa', environment='live', status=status)
+
+    def test_cancelled_provider_failure_is_failed_and_localized(self):
+        p = self.new_payment()
+        apply_subscription_status(reference=p.reference, status='FAILED',
+                                  amount='20000.00', currency='TZS',
+                                  failure_reason={'code':'CUSTOMER_CANCELLED', 'message':'ignore raw message'})
+        p.refresh_from_db()
+        self.company.refresh_from_db()
+        self.assertEqual(p.status, 'FAILED')
+        self.assertEqual(p.last_error, 'EVPAY_FAILURE:CUSTOMER_CANCELLED')
+        self.assertIsNone(self.company.subscription_expires_at)
+        session = self.client.session
+        session['ui_lang'] = 'sw'
+        session.save()
+        page = self.client.get(reverse('payments:subscription_status',args=[p.pk]))
+        self.assertContains(page, 'Umeghairi')
+        self.assertContains(page, 'Jaribu kulipa tena')
+        state = self.client.get(reverse('payments:subscription_state',args=[p.pk])).json()
+        self.assertEqual(state['failure_code'], 'CUSTOMER_CANCELLED')
+
+    def test_unknown_is_not_failed_and_cannot_retry(self):
+        p = self.new_payment()
+        self.assertContains(self.client.get(reverse('payments:subscription_status',args=[p.pk])),
+                            'EvPay could not verify this request')
+        with patch('payments.subscription_views.ensure_settings_ready'), \
+             patch('payments.subscription_views.charge_subscription') as charge:
+            response = self.client.post(reverse('payments:subscription_start'),
+                {'phone':'0712345678', 'operator':'Mpesa'})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(PlatformSubscriptionPayment.objects.filter(company=self.company).count(), 1)
+        charge.assert_not_called()
+
+    def test_immediate_provider_failed_not_rewritten_to_pending(self):
+        with patch('payments.subscription_views.ensure_settings_ready'), \
+             patch('payments.subscription_views.charge_subscription') as charge:
+            charge.return_value = {'status':'FAILED', 'amount':20000, 'currency':'TZS',
+                                   'failureReason':{'code':'CUSTOMER_CANCELLED'}}
+            response = self.client.post(reverse('payments:subscription_start'),
+                {'phone':'0712345678', 'operator':'Mpesa'})
+        self.assertEqual(response.status_code, 302)
+        p=PlatformSubscriptionPayment.objects.get(company=self.company)
+        self.assertEqual(p.status, 'FAILED')
+        self.assertEqual(p.last_error, 'EVPAY_FAILURE:CUSTOMER_CANCELLED')
+        self.assertIsNone(p.applied_at)
+
+    def test_api_outage_stays_unknown_not_failed(self):
+        from payments.evpay import EvPayError
+        with patch('payments.subscription_views.ensure_settings_ready'), \
+             patch('payments.subscription_views.charge_subscription', side_effect=EvPayError('timeout')):
+            self.client.post(reverse('payments:subscription_start'),
+                             {'phone':'0712345678', 'operator':'Mpesa'})
+        self.assertEqual(PlatformSubscriptionPayment.objects.get().status, 'UNKNOWN')

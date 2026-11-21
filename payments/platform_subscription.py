@@ -22,6 +22,23 @@ ALLOWED = {'PENDING', 'PROCESSING', 'ON-HOLD', 'SUCCESS', 'SETTLED',
            'FAILED', 'REFUNDED', 'REVERSED'}
 OPEN = {'CREATED', 'UNKNOWN', 'PENDING', 'PROCESSING', 'ON-HOLD'}
 
+# Canonical failure codes from EvPay's signed payment.failed callback/status API.
+# Only code is stored; never trust/show raw provider message or phone/PIN.
+KNOWN_FAILURE_CODES = frozenset({
+    'CUSTOMER_CANCELLED', 'CUSTOMER_TIMEOUT', 'INSUFFICIENT_FUNDS',
+    'INVALID_PIN', 'SESSION_IN_PROGRESS', 'PUSH_REJECTED',
+    'LIMIT_EXCEEDED', 'INVALID_MSISDN', 'CUSTOMER_NOT_FOUND',
+    'ACCOUNT_BLOCKED', 'DUPLICATE_TRANSACTION', 'NETWORK_ERROR',
+    'AUTHENTICATION_ERROR', 'TRANSACTION_DECLINED',
+})
+
+
+def evpay_failure_code(reason):
+    """Extract stable EvPay failureReason.code from an authenticated outcome."""
+    code = reason.get('code') if isinstance(reason, dict) else reason
+    code = str(code or '').strip().upper()
+    return code if code in KNOWN_FAILURE_CODES else 'UNSPECIFIED'
+
 
 def subscription_expiry(company):
     """Exact expiry first; legacy date-only grace ends at the local day's end."""
@@ -84,7 +101,7 @@ def charge_subscription(payment):
 
 
 def apply_subscription_status(*, reference, status, amount, currency,
-                              transaction_id='', fsp_reference='', delivery_id='', event=''):
+                              transaction_id='', fsp_reference='', delivery_id='', event='', failure_reason=None):
     """Exactly-once extension; later SETTLED/repeated deliveries cannot add months."""
     from .evpay_lab import EVENT_STATUSES
     status = str(status or '').upper()
@@ -112,6 +129,9 @@ def apply_subscription_status(*, reference, status, amount, currency,
             payment.status = status
             payment.last_checked_at = timezone.now()
             fields.extend(['status', 'last_checked_at'])
+            if status == 'FAILED':
+                payment.last_error = 'EVPAY_FAILURE:' + evpay_failure_code(failure_reason)
+                fields.append('last_error')
             if transaction_id:
                 payment.transaction_id = str(transaction_id)[:100]
                 fields.append('transaction_id')
@@ -159,4 +179,5 @@ def retrieve_and_apply_subscription(payment):
         reference=payment.reference, status=data.get('status'),
         amount=data.get('amount'), currency=data.get('currency'),
         transaction_id=data.get('transRef') or data.get('transactionId') or data.get('id') or '',
-        fsp_reference=data.get('mnoRef') or data.get('fspReference') or '')
+        fsp_reference=data.get('mnoRef') or data.get('fspReference') or '',
+        failure_reason=data.get('failureReason'))
