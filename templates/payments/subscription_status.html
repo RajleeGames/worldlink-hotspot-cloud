@@ -15,6 +15,8 @@
         {% if ui_lang == 'sw' %}Umeghairi malipo kwenye simu. Malipo hayakufanyika. Unaweza kujaribu tena.{% else %}You cancelled the payment on your phone. Payment failed. You may try again.{% endif %}
       {% elif payment.last_error == 'EVPAY_FAILURE:CUSTOMER_TIMEOUT' %}
         {% if ui_lang == 'sw' %}Muda wa uthibitisho umeisha. Malipo yameshindikana; jaribu tena.{% else %}The phone approval timed out. Payment failed; you can try again.{% endif %}
+      {% elif payment.last_error == 'EVPAY_FAILURE:INSUFFICIENT_FUNDS' %}
+        {% if ui_lang == 'sw' %}Hauna salio la kutosha kwenye simu kukamilisha malipo haya. Ongeza salio kisha ujaribu tena.{% else %}Insufficient mobile-money balance. Please top up your wallet and try again.{% endif %}
       {% else %}
         {% if ui_lang == 'sw' %}EvPay imethibitisha kuwa malipo yameshindikana. Unaweza kujaribu tena.{% else %}EvPay confirmed this payment failed. You can try again.{% endif %}
       {% endif %}
@@ -54,8 +56,10 @@
     .then(function(d){
       var cancelled=d.status==='FAILED'&&d.failure_code==='CUSTOMER_CANCELLED';
       var timedout=d.status==='FAILED'&&d.failure_code==='CUSTOMER_TIMEOUT';
+      var insufficient=d.status==='FAILED'&&d.failure_code==='INSUFFICIENT_FUNDS';
       state.textContent=cancelled?(sw?'Imeshindikana · Umeghairi malipo':'Failed · Customer cancelled'):
-        timedout?(sw?'Imeshindikana · Muda umeisha':'Failed · Timed out'):(stateLabels[d.status]||d.status);
+        timedout?(sw?'Imeshindikana · Muda umeisha':'Failed · Timed out'):
+        insufficient?(sw?'Imeshindikana · Salio halitoshi':'Failed · Insufficient funds'):(stateLabels[d.status]||d.status);
       if(d.confirmed){
         done=true;box.classList.add('is-done');
         var when=d.expires_at?new Date(d.expires_at).toLocaleString('en-TZ',{
@@ -67,6 +71,7 @@
         done=true;box.classList.add('is-done');
         message.textContent=cancelled?(sw?'Umeghairi malipo kwenye simu. Unaweza kujaribu tena.':'Customer cancelled the phone prompt. You may try again.'):
           timedout?(sw?'Muda wa malipo umeisha. Unaweza kujaribu tena.':'Phone approval timed out. You may try again.'):
+          insufficient?(sw?'Hauna salio la kutosha kwenye simu kukamilisha malipo haya. Ongeza salio kisha ujaribu tena.':'Insufficient mobile-money balance. Please top up your wallet and try again.'):
           (sw?'EvPay imethibitisha malipo yameshindikana. Unaweza kujaribu tena.':'EvPay confirmed payment failed. You may try again.');
         back.textContent=sw?'Jaribu kulipa tena':'Try payment again';
         back.classList.remove('button-secondary');back.classList.add('button-primary');return;

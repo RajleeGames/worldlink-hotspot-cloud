@@ -130,8 +130,14 @@ def apply_subscription_status(*, reference, status, amount, currency,
             payment.last_checked_at = timezone.now()
             fields.extend(['status', 'last_checked_at'])
             if status == 'FAILED':
-                payment.last_error = 'EVPAY_FAILURE:' + evpay_failure_code(failure_reason)
-                fields.append('last_error')
+                code = evpay_failure_code(failure_reason)
+                # An API status check may omit failureReason on a later retry.
+                # Do not erase a previously verified specific failure code.
+                previous_specific = (payment.last_error.startswith('EVPAY_FAILURE:')
+                                     and payment.last_error != 'EVPAY_FAILURE:UNSPECIFIED')
+                if code != 'UNSPECIFIED' or not previous_specific:
+                    payment.last_error = 'EVPAY_FAILURE:' + code
+                    fields.append('last_error')
             if transaction_id:
                 payment.transaction_id = str(transaction_id)[:100]
                 fields.append('transaction_id')

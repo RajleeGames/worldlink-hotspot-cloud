@@ -156,3 +156,68 @@ class SubscriptionFailureStatusTests(TestCase):
             self.client.post(reverse('payments:subscription_start'),
                              {'phone':'0712345678', 'operator':'Mpesa'})
         self.assertEqual(PlatformSubscriptionPayment.objects.get().status, 'UNKNOWN')
+
+
+    def test_verified_insufficient_funds_is_translated_and_retryable(self):
+        p = self.new_payment(status='PENDING', reference='WLS-INSUFF-TEST')
+        apply_subscription_status(
+            reference=p.reference, status='FAILED', amount='20000.00', currency='TZS',
+            failure_reason={'code':'INSUFFICIENT_FUNDS', 'message':'Do not display raw details'})
+        p.refresh_from_db()
+        self.company.refresh_from_db()
+        self.assertEqual(p.status, 'FAILED')
+        self.assertEqual(p.last_error, 'EVPAY_FAILURE:INSUFFICIENT_FUNDS')
+        self.assertIsNone(p.applied_at)
+        self.assertIsNone(self.company.subscription_expires_at)
+        status_url = reverse('payments:subscription_status',args=[p.pk])
+        en = self.client.get(status_url)
+        self.assertContains(en, 'Insufficient mobile-money balance')
+        self.assertContains(en, 'Failed · Insufficient funds')
+        self.assertContains(en, 'Try payment again')
+        self.assertNotContains(en, 'Do not display raw details')
+        self.assertEqual(self.client.get(reverse('payments:subscription_state',args=[p.pk])).json()['failure_code'],
+                         'INSUFFICIENT_FUNDS')
+        dashboard = self.client.get(reverse('payments:subscription_dashboard'))
+        self.assertContains(dashboard, 'Failed · Insufficient funds')
+        self.assertContains(dashboard, 'wlsubPayForm')  # payment is terminal, so checkout is available
+        session=self.client.session
+        session['ui_lang']='sw'
+        session.save()
+        sw = self.client.get(status_url)
+        self.assertContains(sw, 'Hauna salio la kutosha')
+        self.assertContains(sw, 'Imeshindikana · Salio halitoshi')
+        self.assertContains(sw, 'Jaribu kulipa tena')
+        sw_dashboard = self.client.get(reverse('payments:subscription_dashboard'))
+        self.assertContains(sw_dashboard, 'Imeshindikana · Salio halitoshi')
+
+    def test_failed_reconciliation_without_reason_preserves_insufficient_code(self):
+        p = self.new_payment(status='UNKNOWN', reference='WLS-INSUFF-PRESERVE')
+        apply_subscription_status(
+            reference=p.reference, status='FAILED', amount='20000.00', currency='TZS',
+            failure_reason={'code':'INSUFFICIENT_FUNDS'})
+        apply_subscription_status(
+            reference=p.reference, status='FAILED', amount='20000.00', currency='TZS',
+            failure_reason=None)
+        p.refresh_from_db()
+        self.assertEqual(p.last_error, 'EVPAY_FAILURE:INSUFFICIENT_FUNDS')
+
+    def test_readonly_reconciliation_reports_insufficient_funds_without_renewal(self):
+        from payments.platform_subscription import retrieve_and_apply_subscription
+        p = self.new_payment(status='PENDING', reference='WLS-INSUFF-GET')
+        data = {'requestId':p.reference,'status':'FAILED','amount':20000,'currency':'TZS',
+                'failureReason': {'code':'INSUFFICIENT_FUNDS','source':'fsp'}}
+        with patch('payments.platform_subscription.retrieve_ussd', return_value=data):
+            retrieve_and_apply_subscription(p)
+        p.refresh_from_db()
+        self.company.refresh_from_db()
+        self.assertEqual(p.status, 'FAILED')
+        self.assertEqual(p.last_error, 'EVPAY_FAILURE:INSUFFICIENT_FUNDS')
+        self.assertIsNone(self.company.subscription_expires_at)
+
+    def test_generic_failure_does_not_claim_insufficient_funds(self):
+        p = self.new_payment(status='PENDING', reference='WLS-NO-REASON')
+        apply_subscription_status(reference=p.reference, status='FAILED',
+                                  amount='20000.00', currency='TZS', failure_reason=None)
+        page = self.client.get(reverse('payments:subscription_status',args=[p.pk]))
+        self.assertContains(page, 'EvPay confirmed this payment failed')
+        self.assertNotContains(page, 'Insufficient mobile-money balance')
