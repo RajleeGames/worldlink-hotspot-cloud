@@ -187,3 +187,31 @@ def retrieve_and_apply_subscription(payment):
         transaction_id=data.get('transRef') or data.get('transactionId') or data.get('id') or '',
         fsp_reference=data.get('mnoRef') or data.get('fspReference') or '',
         failure_reason=data.get('failureReason'))
+
+
+def abandon_subscription_attempt(payment):
+    """Release an unapproved attempt without changing provider status."""
+    if payment.abandoned_at:
+        return payment
+
+    age = (timezone.now() - payment.created_at).total_seconds()
+    if age < 60 or payment.applied_at:
+        raise ValueError("Payment is not eligible for cancellation.")
+
+    payment, _ = retrieve_and_apply_subscription(payment)
+
+    if payment.status not in OPEN:
+        return payment
+
+    if payment.status != 'PENDING' or payment.applied_at:
+        raise ValueError("Payment cannot safely be released yet.")
+
+    PlatformSubscriptionPayment.objects.filter(
+        pk=payment.pk,
+        status='PENDING',
+        applied_at__isnull=True,
+        abandoned_at__isnull=True,
+    ).update(abandoned_at=timezone.now())
+
+    payment.refresh_from_db()
+    return payment

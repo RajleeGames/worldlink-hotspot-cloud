@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views, evpay_views, collection_views, subscription_views
 urlpatterns = [
+    path('subscriptions/payment/<int:pk>/cancel/', subscription_views.subscription_cancel, name='subscription_cancel'),
     path('subscriptions/', subscription_views.subscription_dashboard, name='subscription_dashboard'),
     path('subscriptions/pay/', subscription_views.subscription_start, name='subscription_start'),
     path('subscriptions/payment/<int:pk>/', subscription_views.subscription_status, name='subscription_status'),

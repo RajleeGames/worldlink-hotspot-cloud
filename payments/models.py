@@ -220,6 +220,7 @@ class PlatformSubscriptionPayment(models.Model):
     fsp_reference = models.CharField(max_length=100, blank=True)
     confirmed_at = models.DateTimeField(null=True, blank=True)
     applied_at = models.DateTimeField(null=True, blank=True)
+    abandoned_at = models.DateTimeField(null=True, blank=True)
     period_starts = models.DateField(null=True, blank=True)
     period_ends = models.DateField(null=True, blank=True)
     period_started_at = models.DateTimeField(null=True, blank=True)

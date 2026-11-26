@@ -31,6 +31,34 @@
       {% if ui_lang == 'sw' %}Subiri uthibitisho wa EvPay. Usitume malipo mara mbili.{% else %}Waiting for EvPay confirmation. Do not send another payment.{% endif %}
     {% endif %}
   </p>
+  {% if can_cancel %}
+  <form method="post"
+        id="wlsubCancelForm"
+        action="{% url 'payments:subscription_cancel' payment.pk %}"
+        {% if payment_seconds_remaining %}hidden{% endif %}>
+    {% csrf_token %}
+    <p>
+      <label>
+        <input type="checkbox" name="confirm_cancel" value="yes" required>
+        {% if ui_lang == 'sw' %}
+        Sijaidhinisha malipo haya wala kukatwa pesa.
+        {% else %}
+        I have not approved this payment or been charged.
+        {% endif %}
+      </label>
+    </p>
+    <p>
+      {% if ui_lang == 'sw' %}
+      Usithibitishe ombi la zamani likifika. Malipo mawili yanaweza kukatwa ukiidhinisha yote.
+      {% else %}
+      Do not approve the old prompt if it arrives. Approving both requests may charge you twice.
+      {% endif %}
+    </p>
+    <button type="submit" class="button button-primary wlsub-action">
+      {% if ui_lang == 'sw' %}Ghairi na ujaribu tena{% else %}Cancel &amp; try again{% endif %}
+    </button>
+  </form>
+  {% endif %}
   <a id="wlsubBackLink" class="button {% if payment.status == 'FAILED' %}button-primary{% else %}button-secondary{% endif %} wlsub-action" href="{% url 'payments:subscription_dashboard' %}">{% if payment.status == 'FAILED' %}{% if ui_lang == 'sw' %}Jaribu kulipa tena{% else %}Try payment again{% endif %}{% else %}{% if ui_lang == 'sw' %}Rudi kwenye usajili{% else %}Back to subscription{% endif %}{% endif %}</a>
 </section>
 <script>
@@ -42,19 +70,21 @@
   var url='{% url 'payments:subscription_state' payment.pk %}';
   var sw={% if ui_lang == 'sw' %}true{% else %}false{% endif %};
   var done=false;
+  var cancelForm=document.getElementById('wlsubCancelForm');
   var countdown=document.getElementById('wlsubCountdown');
   var deadline=Date.now()+{{ payment_seconds_remaining }}*1000;
 
   function showTimeout(){
     if(done||!countdown)return;
     countdown.hidden=true;
+    if(cancelForm)cancelForm.hidden=false;
     box.classList.add('is-done');
     state.textContent=sw
       ?'Muda wa kusubiri umeisha'
       :'Payment waiting time expired';
     message.textContent=sw
-      ?'Malipo bado hayajathibitishwa. Unaweza kuondoka kwenye ukurasa huu. Mfumo utaendelea kuhakiki malipo. Usilipe tena hadi hali ithibitishwe.'
-      :'Payment is not yet confirmed. You can leave this page. Verification will continue automatically. Do not pay again until the outcome is confirmed.';
+      ?'Hukupokea ombi la malipo? Unaweza kughairi ombi hili ikiwa hujaidhinisha malipo wala kukatwa pesa.'
+      :'Did not receive the payment prompt? You may cancel this attempt if you have not approved it or been charged.';
     back.textContent=sw?'Rudi kwenye usajili':'Back to subscription';
   }
 
@@ -94,6 +124,21 @@
       if(countdown && (d.confirmed ||
           ['FAILED','REFUNDED','REVERSED'].includes(d.status))){
         countdown.hidden=true;
+      }
+      if(cancelForm && (d.confirmed ||
+          ['FAILED','REFUNDED','REVERSED','SUCCESS','SETTLED'].includes(d.status))){
+        cancelForm.hidden=true;
+      }
+      if(d.abandoned && ['CREATED','PENDING','UNKNOWN','PROCESSING','ON-HOLD'].includes(d.status)){
+        if(cancelForm)cancelForm.hidden=true;
+        if(countdown)countdown.hidden=true;
+        box.classList.add('is-done');
+        state.textContent=sw?'Ombi limeghairiwa':'Attempt cancelled';
+        message.textContent=sw
+          ?'Ombi limefungwa kwenye WorldLink. Uhakiki wa EvPay unaendelea.'
+          :'Attempt closed in WorldLink. Provider verification continues.';
+        setTimeout(check,15000);
+        return;
       }
       if(d.confirmed){
         done=true;box.classList.add('is-done');

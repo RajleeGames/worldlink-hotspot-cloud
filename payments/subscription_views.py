@@ -25,7 +25,7 @@ from .evpay_lab import EVENT_STATUSES
 from .models import PlatformSubscriptionPayment
 from .platform_subscription import (PRICE, OPEN, active_subscription,
     apply_subscription_status, charge_subscription, retrieve_and_apply_subscription,
-    subscription_expiry, evpay_failure_code)
+    subscription_expiry, evpay_failure_code, abandon_subscription_attempt)
 
 
 SUBSCRIPTION_WAIT_SECONDS = 60
@@ -67,7 +67,7 @@ def subscription_dashboard(request):
     m = _membership(request)
     history = PlatformSubscriptionPayment.objects.filter(company=m.company).order_by('-created_at')[:15]
     pending = PlatformSubscriptionPayment.objects.filter(
-        company=m.company, status__in=OPEN).order_by('-created_at').first()
+        company=m.company, status__in=OPEN, abandoned_at__isnull=True).order_by('-created_at').first()
     has_paid = PlatformSubscriptionPayment.objects.filter(company=m.company, applied_at__isnull=False).exists()
     response = render(request, 'payments/subscription_dashboard.html', {
         'page_title': 'Monthly subscription', 'company': m.company,
@@ -114,7 +114,7 @@ def subscription_start(request):
     with transaction.atomic():
         company = Company.objects.select_for_update().get(pk=m.company_id)
         existing = PlatformSubscriptionPayment.objects.filter(
-            company=company, status__in=OPEN).order_by('-created_at').first()
+            company=company, status__in=OPEN, abandoned_at__isnull=True).order_by('-created_at').first()
         if existing:
             return redirect('payments:subscription_status', pk=existing.pk)
         payment = PlatformSubscriptionPayment.objects.create(
@@ -170,7 +170,9 @@ def subscription_status(request, pk):
     p = get_object_or_404(PlatformSubscriptionPayment, pk=pk, company=m.company)
     response = render(request, 'payments/subscription_status.html', {
         'page_title': 'Subscription payment', 'payment': p,
-        'payment_open': p.status in OPEN and not p.applied_at,
+        'payment_open': p.status in OPEN and not p.applied_at and not p.abandoned_at,
+        'payment_abandoned': bool(p.abandoned_at and p.status in OPEN),
+        'can_cancel': m.role in ('OWNER','MANAGER') and p.status in OPEN and not p.applied_at and not p.abandoned_at,
         'payment_seconds_remaining': subscription_seconds_remaining(p),
         'active': active_subscription(m.company), 'company': m.company,
     })
@@ -186,10 +188,41 @@ def subscription_state(request, pk):
                    if p.status == 'FAILED' and p.last_error.startswith('EVPAY_FAILURE:') else '')
     response = JsonResponse({'status':p.status, 'confirmed':bool(p.applied_at),
         'failure_code': reason_code,
+        'abandoned': bool(p.abandoned_at),
         'expires':p.period_ends.isoformat() if p.period_ends else None,
         'expires_at':p.period_expires_at.isoformat() if p.period_expires_at else None})
     response['Cache-Control'] = 'no-store'
     return response
+
+
+@login_required
+@require_POST
+def subscription_cancel(request, pk):
+    m = _membership(request)
+    if m.role not in ('OWNER', 'MANAGER'):
+        raise PermissionDenied()
+
+    p = get_object_or_404(
+        PlatformSubscriptionPayment, pk=pk, company=m.company
+    )
+    sw = request.session.get('ui_lang') == 'sw'
+
+    if request.POST.get('confirm_cancel') != 'yes':
+        return redirect('payments:subscription_status', pk=p.pk)
+
+    try:
+        p = abandon_subscription_attempt(p)
+    except (EvPayError, ValueError, LookupError, OSError):
+        messages.error(request,
+            'Malipo bado hayajaweza kughairiwa. Hakiki tena.'
+            if sw else
+            'Payment cannot be released yet. Please check again.')
+        return redirect('payments:subscription_status', pk=p.pk)
+
+    if p.applied_at:
+        return redirect('payments:subscription_status', pk=p.pk)
+
+    return redirect('payments:subscription_dashboard')
 
 
 @csrf_exempt
