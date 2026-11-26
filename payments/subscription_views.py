@@ -28,6 +28,17 @@ from .platform_subscription import (PRICE, OPEN, active_subscription,
     subscription_expiry, evpay_failure_code)
 
 
+SUBSCRIPTION_WAIT_SECONDS = 60
+
+
+def subscription_seconds_remaining(payment):
+    elapsed = (timezone.now() - payment.created_at).total_seconds()
+    return max(0, min(
+        SUBSCRIPTION_WAIT_SECONDS,
+        ceil(SUBSCRIPTION_WAIT_SECONDS - elapsed)
+    ))
+
+
 def _membership(request):
     member = active_membership(request)
     if member is None:
@@ -61,6 +72,9 @@ def subscription_dashboard(request):
     response = render(request, 'payments/subscription_dashboard.html', {
         'page_title': 'Monthly subscription', 'company': m.company,
         'price': PRICE, 'fee_display': f'{PRICE:,.0f}', 'history': history, 'pending': pending,
+        'pending_timed_out': bool(
+            pending and subscription_seconds_remaining(pending) == 0
+        ),
         **subscription_view_data(m.company, has_paid=has_paid),
         'can_pay': m.role in ('OWNER','MANAGER'),
         'can_use': active_subscription(m.company),
@@ -156,6 +170,8 @@ def subscription_status(request, pk):
     p = get_object_or_404(PlatformSubscriptionPayment, pk=pk, company=m.company)
     response = render(request, 'payments/subscription_status.html', {
         'page_title': 'Subscription payment', 'payment': p,
+        'payment_open': p.status in OPEN and not p.applied_at,
+        'payment_seconds_remaining': subscription_seconds_remaining(p),
         'active': active_subscription(m.company), 'company': m.company,
     })
     response['Cache-Control'] = 'private, no-store'

@@ -30,7 +30,14 @@
 <div class="wlsub-body-grid">
   <section id="wlsub-checkout" class="panel wlsub-checkout">
     <div class="panel-heading"><div><h2>{% if ui_lang == 'sw' %}Lipa kwa simu{% else %}Pay with mobile money{% endif %}</h2><p>{% if ui_lang == 'sw' %}Malipo hupelekwa WorldLink. Mfumo huongeza mwezi baada ya EvPay kuthibitisha.{% else %}Payment goes to WorldLink. Your month is added once EvPay confirms payment.{% endif %}</p></div></div>
-    {% if pending %}
+    {% if pending and pending_timed_out %}
+      <div class="wlsub-message" role="status">
+        <strong>{% if ui_lang == 'sw' %}Muda wa kusubiri malipo umeisha{% else %}Payment waiting time expired{% endif %}</strong>
+        <p>{% if ui_lang == 'sw' %}Bado tunahakiki malipo yako. Usilipe tena hadi hali ya malipo ithibitishwe.{% else %}Your payment is still being verified. Do not pay again until its status is confirmed.{% endif %}</p>
+        <a class="button button-primary wlsub-action" href="{% url 'payments:subscription_status' pending.pk %}">{% if ui_lang == 'sw' %}Hakiki malipo{% else %}Check payment{% endif %}</a>
+        <p><a href="https://wa.me/255780850748" target="_blank" rel="noopener noreferrer">{% if ui_lang == 'sw' %}Wasiliana na WorldLink{% else %}Contact WorldLink support{% endif %}</a></p>
+      </div>
+    {% elif pending %}
       <div class="wlsub-message" role="status"><strong>{% if ui_lang == 'sw' %}Malipo yanaendelea kuhakikiwa{% else %}A payment is being verified{% endif %}</strong><p>{% if ui_lang == 'sw' %}Usitume ombi jingine. Angalia hali ya ombi la sasa.{% else %}Do not send another request. Check the existing payment first.{% endif %}</p><a class="button button-primary wlsub-action" href="{% url 'payments:subscription_status' pending.pk %}">{% if ui_lang == 'sw' %}Angalia malipo{% else %}Check payment status{% endif %}</a></div>
     {% elif can_pay and billing_enabled %}
       <form method="post" action="{% url 'payments:subscription_start' %}" class="wlsub-checkout-form" id="wlsubPayForm">

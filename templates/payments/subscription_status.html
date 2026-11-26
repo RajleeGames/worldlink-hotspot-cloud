@@ -5,6 +5,9 @@
   <div class="wlsub-wait-icon"><span class="wlsub-spinner" aria-hidden="true"></span></div>
   <h2 id="subscription-state">{% include "payments/_subscription_status_label.html" with payment=payment %}</h2>
   <p class="wlsub-ref">{{ payment.reference }}</p>
+  {% if payment_open %}
+  <p id="wlsubCountdown" style="font-size:26px;font-weight:500;font-variant-numeric:tabular-nums"></p>
+  {% endif %}
   <p>{% if ui_lang == 'sw' %}Kiasi{% else %}Amount{% endif %}: <strong>TZS {{ payment.amount|floatformat:'0g' }}</strong></p>
   <p id="subscription-result" role="status" aria-live="polite">
     {% if payment.applied_at %}
@@ -38,7 +41,35 @@
   var back=document.getElementById('wlsubBackLink');
   var url='{% url 'payments:subscription_state' payment.pk %}';
   var sw={% if ui_lang == 'sw' %}true{% else %}false{% endif %};
-  var tries=0,done=false;
+  var done=false;
+  var countdown=document.getElementById('wlsubCountdown');
+  var deadline=Date.now()+{{ payment_seconds_remaining }}*1000;
+
+  function showTimeout(){
+    if(done||!countdown)return;
+    countdown.hidden=true;
+    box.classList.add('is-done');
+    state.textContent=sw
+      ?'Muda wa kusubiri umeisha'
+      :'Payment waiting time expired';
+    message.textContent=sw
+      ?'Malipo bado hayajathibitishwa. Unaweza kuondoka kwenye ukurasa huu. Mfumo utaendelea kuhakiki malipo. Usilipe tena hadi hali ithibitishwe.'
+      :'Payment is not yet confirmed. You can leave this page. Verification will continue automatically. Do not pay again until the outcome is confirmed.';
+    back.textContent=sw?'Rudi kwenye usajili':'Back to subscription';
+  }
+
+  function tick(){
+    if(!countdown||done)return;
+    var left=Math.max(0,Math.ceil((deadline-Date.now())/1000));
+    if(left===0){
+      showTimeout();
+      return;
+    }
+    countdown.textContent='0'+Math.floor(left/60)+':'+String(left%60).padStart(2,'0');
+    setTimeout(tick,250);
+  }
+
+  tick();
   var stateLabels={
     CREATED:sw?'Imeanzishwa':'Created',
     UNKNOWN:sw?'Inasubiri uhakiki wa EvPay':'Verification unavailable',
@@ -50,7 +81,7 @@
     REFUNDED:sw?'Imerejeshwa':'Refunded', REVERSED:sw?'Imetenguliwa':'Reversed'
   };
   function check(){
-    if(done||tries++>=180)return;
+    if(done)return;
     fetch(url,{credentials:'same-origin',cache:'no-store'})
     .then(function(res){if(!res.ok)throw Error('network');return res.json();})
     .then(function(d){
@@ -60,6 +91,10 @@
       state.textContent=cancelled?(sw?'Imeshindikana · Umeghairi malipo':'Failed · Customer cancelled'):
         timedout?(sw?'Imeshindikana · Muda umeisha':'Failed · Timed out'):
         insufficient?(sw?'Imeshindikana · Salio halitoshi':'Failed · Insufficient funds'):(stateLabels[d.status]||d.status);
+      if(countdown && (d.confirmed ||
+          ['FAILED','REFUNDED','REVERSED'].includes(d.status))){
+        countdown.hidden=true;
+      }
       if(d.confirmed){
         done=true;box.classList.add('is-done');
         var when=d.expires_at?new Date(d.expires_at).toLocaleString('en-TZ',{
@@ -79,6 +114,11 @@
       if(['REFUNDED','REVERSED'].includes(d.status)){
         done=true;box.classList.add('is-done');
         message.textContent=sw?'Malipo yamerudishwa au kutenguliwa. Wasiliana na WorldLink.':'Payment reversed or refunded. Contact WorldLink support.';return;
+      }
+      if(countdown && Date.now()>=deadline){
+        showTimeout();
+        setTimeout(check,15000);
+        return;
       }
       if(d.status==='UNKNOWN'){
         message.textContent=sw?'EvPay haijapatikana kuthibitisha ombi hili. Haimaanishi malipo yameshindikana. Usilipe tena.':'EvPay could not verify this request. It may still complete. Do not pay again.';
