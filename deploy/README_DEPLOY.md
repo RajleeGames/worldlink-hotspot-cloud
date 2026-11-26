@@ -148,5 +148,5 @@ It backs up SQLite with Python's online backup API, runs `git pull --ff-only`, `
 - The v0.8 EvPay integration is only a single-company pilot lab; it does **not** grant router internet access, offer general multi-merchant settlement, or handle merchant payouts.
 - Hosted public login and webhook endpoints are exposed to the internet. Keep public signup disabled, use strong private credentials, rotate previously exposed secrets, and limit access to trusted testers during the pilot.
 - SQLite works for a pilot, but has limited write concurrency. Monitor `database is locked`, schedule backups, and migrate to PostgreSQL before broad customer use.
-- Invitation emails require real SMTP credentials; this starter does not configure SMTP for production.
+- Invitation emails require valid SMTP credentials configured for production.
 - Never `git reset --hard` the VPS during deployment or overwrite the `.env`/SQLite database/media.

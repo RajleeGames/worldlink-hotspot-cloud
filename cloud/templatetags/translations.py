@@ -205,7 +205,6 @@ SW = {
     'Contact your platform administrator for access.':'Wasiliana na msimamizi wa mfumo ili kupata ruhusa.',
     'No business access':'Hakuna ruhusa ya biashara',
     'Back to dashboard':'Rudi kwenye dashibodi',
-    'This is a starter platform; payments and live RADIUS/Omada authentication require the next integration phase.':'Huu ni mfumo wa mwanzo; malipo na uthibitishaji wa RADIUS/Omada vinahitaji awamu inayofuata.',
     'Business access':'Ufikiaji wa biashara',
     'Create your workspace':'Tengeneza eneo lako',
     'Manage business information':'Simamia taarifa za biashara',
@@ -232,7 +231,6 @@ SW = {
     'Please sign in to your account':'Tafadhali ingia kwenye akaunti yako',
     'Platform sign-up is currently closed. Contact WorldLink to activate an account.':'Usajili umefungwa kwa sasa. Wasiliana na WorldLink kufungua akaunti.',
     'Registration unavailable':'Usajili haupatikani',
-    'Starter preview':'Toleo la mwanzo',
     'Switch theme':'Badili mandhari',
     # v0.6 WorldLink staff operations and secure onboarding
     'Choose your workspace and sign in securely.':'Chagua eneo la kazi na uingie kwa usalama.',

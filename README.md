@@ -2,7 +2,7 @@
 
 **WORLDLINK SECURITY SYSTEMS** · Linking Security to Every Corner!
 
-A Django multi-business starter platform for Wi-Fi hotspot operations, packaged for the Windows development workflow at `C:\Users\user\worldlink-projects\worldlink-hotspot-cloud`.
+WorldLink Hotspot Cloud is a multi-business Wi-Fi hotspot management platform developed by WorldLink Security Systems.
 
 ## What is in this ZIP
 
@@ -21,7 +21,7 @@ A Django multi-business starter platform for Wi-Fi hotspot operations, packaged 
 - Pillow image validation (PNG/JPG/WebP/GIF, max 2MB; SVG excluded). Uploaded files saved in `media/`; for production, serve only validated image MIME types safely.
 - SQLite for local development; PostgreSQL environment option for later production hosting.
 
-> **Important:** Routers are inventory records, **not connected**. Vouchers are database records, **not live Wi-Fi access codes**. Manual sale records are **not verified mobile-money transactions**. No RADIUS/Omada session management or mobile-money integration is implemented in this starter. Do not charge users for live internet access using this system yet.
+> WorldLink Hotspot Cloud supports voucher management, payment integration and hotspot operations. Live services require properly configured hardware, controllers and payment credentials.
 
 ## Run in Windows (first time)
 
