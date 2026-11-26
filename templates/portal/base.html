@@ -7,7 +7,7 @@
   <meta name="theme-color" content="{{ portal.accent_color }}">
   <meta name="referrer" content="same-origin">
   <title>{{ company.name }} · {{ w.guest_wifi }}</title>
-  {% if company.logo %}<link rel="icon" type="image/png" href="{{ company.logo.url }}">{% else %}<link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">{% endif %}
+  {% if company.logo %}<link rel="icon" type="image/png" href="{{ company.logo.url }}">{% else %}<link rel="icon" href="{% static 'img/worldlink-hotspot-32.png' %}" type="image/png">{% endif %}
   <link rel="stylesheet" href="{% static 'css/app.css' %}?v={{ app_css_version }}">
   <style>
     :root { --portal-accent: {{ portal.accent_color }}; }

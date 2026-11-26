@@ -1,1 +1,4 @@
-{% load static %}{% if platform_brand and platform_brand.logo %}<link rel="icon" href="{{ platform_brand.logo.url }}">{% else %}<link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}">{% endif %}
+{% load static %}
+<link rel="icon" href="{% static 'img/worldlink-hotspot-favicon.ico' %}" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/worldlink-hotspot-32.png' %}">
+<link rel="apple-touch-icon" sizes="180x180" href="{% static 'img/worldlink-hotspot-apple.png' %}">

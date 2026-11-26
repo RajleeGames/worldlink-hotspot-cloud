@@ -1231,3 +1231,17 @@ button.is-submitting::before{content:'';display:inline-block;width:13px;height:1
     cursor: progress;
 }
 
+
+/* WorldLink Hotspot product identity */
+.brand-mark:has(.whc-product-icon),
+.workspace-icon:has(.whc-product-icon),
+.whc-loader-logo:has(.whc-product-icon) {
+  background: #fff; border: 1px solid rgba(26,93,159,.12);
+}
+.whc-product-icon.brand-image { display:block; width:100%; height:100%; object-fit:contain; padding:3px; background:#fff; }
+.whc-auth-lockup { display:block; width:min(240px,100%); }
+.whc-auth-lockup img { display:block; width:100%; height:auto; }
+.whc-auth-lockup .whc-lockup-dark { display:none; }
+html[data-theme="dark"] .whc-auth-lockup .whc-lockup-light { display:none; }
+html[data-theme="dark"] .whc-auth-lockup .whc-lockup-dark { display:block; }
+.whc-brand-company { font-size:9px; color:var(--muted); letter-spacing:.06em; text-align:center; line-height:1.5; }

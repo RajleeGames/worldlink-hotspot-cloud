@@ -23,8 +23,11 @@
 </header>
 <main class="auth-shell"><section class="auth-card">
   <a href="{% url 'cloud:home' %}" class="auth-brand">
-    <span class="brand-mark brand-mark-auth">{% include 'partials/brand_icon.html' %}</span>
-    <span class="brand-words"><strong>{{ platform_brand.product_name|default:'WorldLink Hotspot Cloud' }}</strong><small>{{ platform_brand.name|default:'WORLDLINK SECURITY SYSTEMS' }}</small></span>
+    <span class="whc-auth-lockup">
+      <img class="whc-lockup-light" src="{% static 'img/worldlink-hotspot-logo.png' %}" alt="WorldLink Hotspot">
+      <img class="whc-lockup-dark" src="{% static 'img/worldlink-hotspot-logo-dark.png' %}" alt="WorldLink Hotspot">
+    </span>
+    <span class="whc-brand-company">{{ platform_brand.name|default:'WORLDLINK SECURITY SYSTEMS' }}</span>
   </a>
   {% block auth_content %}{% endblock %}
 </section>
