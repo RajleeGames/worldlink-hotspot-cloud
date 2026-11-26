@@ -95,6 +95,8 @@
 
   // Native keyboard-friendly selects, with a custom animated chevron and clean focus.
   document.querySelectorAll('select.input, select.language-select').forEach(select => {
+    // Keep subscription payment network selection lightweight.
+    if (select.id === 'wlsubOperator') return;
     if (select.parentElement?.classList.contains('select-wrap')) return;
     const wrap = document.createElement('span');
     wrap.className = 'select-wrap';

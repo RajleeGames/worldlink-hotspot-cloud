@@ -55,6 +55,16 @@
 </div>
 <section class="panel wlsub-history"><div class="panel-heading"><h2>{% if ui_lang == 'sw' %}Historia ya malipo{% else %}Payment history{% endif %}</h2></div><div class="table-wrap"><table class="data-table"><thead><tr><th>{% if ui_lang == 'sw' %}Tarehe{% else %}Date{% endif %}</th><th>{% if ui_lang == 'sw' %}Kumbukumbu{% else %}Reference{% endif %}</th><th>{% if ui_lang == 'sw' %}Hali{% else %}Status{% endif %}</th><th>{% if ui_lang == 'sw' %}Kiasi{% else %}Amount{% endif %}</th><th>{% if ui_lang == 'sw' %}Mwisho wa muda{% else %}Expiry{% endif %}</th></tr></thead><tbody>{% for p in history %}<tr><td>{{ p.created_at|date:'d M Y, H:i' }}</td><td><a href="{% url 'payments:subscription_status' p.pk %}" class="wlsub-ref">{{ p.reference }}</a></td><td><span class="wlsub-state {% if p.status == 'SUCCESS' or p.status == 'SETTLED' %}wlsub-state-active{% elif p.status == 'FAILED' or p.status == 'REVERSED' or p.status == 'REFUNDED' %}wlsub-state-expired{% else %}wlsub-state-grace{% endif %}">{% include "payments/_subscription_status_label.html" with payment=p %}</span></td><td>TZS {{ p.amount|floatformat:'0g' }}</td><td>{% if p.period_expires_at %}{{ p.period_expires_at|date:'d M Y, H:i' }}{% elif p.period_ends %}{{ p.period_ends|date:'d M Y' }}{% else %}—{% endif %}</td></tr>{% empty %}<tr><td colspan="5" class="empty-cell">{% if ui_lang == 'sw' %}Hakuna malipo bado{% else %}No payments yet{% endif %}</td></tr>{% endfor %}</tbody></table></div></section>
 <script>
-(function(){var f=document.getElementById('wlsubPayForm');if(!f)return;var b=document.getElementById('wlsubPayButton'),label=b.querySelector('[data-pay-label]'),msg=document.getElementById('wlsubWait');f.addEventListener('submit',function(e){if(f.dataset.sending==='yes'){e.preventDefault();return;}if(!f.checkValidity())return;f.dataset.sending='yes';b.classList.add('is-loading');b.setAttribute('aria-busy','true');b.disabled=true;label.textContent={% if ui_lang == 'sw' %}'Inatuma ombi…'{% else %}'Sending request…'{% endif %};msg.hidden=false;});})();
+(function(){var f=document.getElementById('wlsubPayForm');if(!f)return;var b=document.getElementById('wlsubPayButton'),label=b.querySelector('[data-pay-label]'),msg=document.getElementById('wlsubWait');var originalLabel=label.textContent;
+window.addEventListener('pageshow',function(e){
+    if(!e.persisted)return;
+    f.dataset.sending='';
+    b.disabled=false;
+    b.classList.remove('is-loading','is-submitting');
+    b.removeAttribute('aria-busy');
+    label.textContent=originalLabel;
+    msg.hidden=true;
+});
+f.addEventListener('submit',function(e){if(f.dataset.sending==='yes'){e.preventDefault();return;}if(!f.checkValidity())return;f.dataset.sending='yes';b.classList.add('is-loading');b.setAttribute('aria-busy','true');b.disabled=true;label.textContent={% if ui_lang == 'sw' %}'Inatuma ombi…'{% else %}'Sending request…'{% endif %};msg.hidden=false;});})();
 </script>
 {% endblock %}

@@ -99,6 +99,11 @@
 
   document.addEventListener('submit', event => {
     const form = event.target;
+
+    // Subscription checkout manages its own loading state.
+    if (form instanceof HTMLFormElement &&
+        form.matches('.wlsub-checkout-form')) return;
+
     if (!(form instanceof HTMLFormElement) || form.method.toLowerCase() !== 'post'
         || form.hasAttribute('onsubmit') || !form.checkValidity() || event.defaultPrevented) return;
     if (form.dataset.whcSubmitting === 'true') {
