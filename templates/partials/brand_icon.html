@@ -1,1 +1,6 @@
-{% load static %}<img src="{% static 'img/worldlink-hotspot-icon.png' %}" alt="" class="brand-image whc-product-icon">
+{% load static %}
+{% if platform_brand.logo %}
+<img src="{{ platform_brand.logo.url }}" alt="" class="brand-image whc-product-icon">
+{% else %}
+<img src="{% static 'img/worldlink-hotspot-icon.png' %}" alt="" class="brand-image whc-product-icon">
+{% endif %}

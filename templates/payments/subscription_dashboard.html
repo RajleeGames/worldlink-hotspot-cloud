@@ -1,6 +1,5 @@
 {% extends 'base.html' %}{% load static %}
 {% block content %}
-<link rel="stylesheet" href="{% static 'css/subscription_v2.css' %}?v={{ app_css_version }}">
 <div class="page-heading wlsub-title"><div><p class="eyebrow">WORLDLINK · {% if ui_lang == 'sw' %}USAJILI WA MWEZI{% else %}MONTHLY BILLING{% endif %}</p><h1>{% if ui_lang == 'sw' %}Usajili wa mfumo{% else %}Platform subscription{% endif %}</h1><p>{{ company.name }}</p></div></div>
 <section class="wlsub-hero">
   <div class="wlsub-hero-copy">

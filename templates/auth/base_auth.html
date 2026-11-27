@@ -21,16 +21,33 @@
   <form method="post" action="{% url 'language_change' %}" class="language-form">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><select name="language" class="language-select" aria-label="Language" onchange="this.form.submit()"><option value="en" {% if ui_lang == 'en' %}selected{% endif %}>EN</option><option value="sw" {% if ui_lang == 'sw' %}selected{% endif %}>SW</option></select></form>
   <button type="button" class="icon-button theme-toggle" data-theme-toggle aria-label="{% t 'Switch theme' %}" title="{% t 'Switch theme' %}"><svg class="icon" aria-hidden="true"><use href="#ico-moon"></use></svg></button>
 </header>
-<main class="auth-shell"><section class="auth-card">
+<main class="auth-shell"><div class="auth-layout">
+  <aside class="auth-story" aria-label="WorldLink Hotspot Cloud">
+    <p class="auth-story-kicker">WORLDLINK HOTSPOT CLOUD</p>
+    <h2>{% if ui_lang == 'sw' %}Simamia biashara yako ya Wi-Fi kwa urahisi.{% else %}Your Wi-Fi business, in one place.{% endif %}</h2>
+    <p>{% if ui_lang == 'sw' %}Simamia vocha, wateja, malipo na mtandao wako kupitia mfumo mmoja wa wingu.{% else %}Manage vouchers, customers, payments and your network from one cloud workspace.{% endif %}</p>
+    <ul class="auth-story-list">
+      <li><svg class="icon" aria-hidden="true"><use href="#ico-router"></use></svg>{% t 'Network management' %}</li>
+      <li><svg class="icon" aria-hidden="true"><use href="#ico-ticket"></use></svg>{% t 'Voucher operations' %}</li>
+      <li><svg class="icon" aria-hidden="true"><use href="#ico-chart"></use></svg>{% t 'Sales reports' %}</li>
+    </ul>
+    <a class="auth-site-link" href="https://hotspot.worldlinksecurity.co.tz/">{% if ui_lang == 'sw' %}Tembelea tovuti yetu{% else %}Explore our website{% endif %} <span aria-hidden="true">↗</span></a>
+  </aside>
+  <section class="auth-card">
   <a href="{% url 'cloud:home' %}" class="auth-brand">
     <span class="whc-auth-lockup">
+      {% if platform_brand.logo %}
+      <img class="whc-custom-lockup" src="{{ platform_brand.logo.url }}" alt="WorldLink Hotspot Cloud">
+      {% else %}
       <img class="whc-lockup-light" src="{% static 'img/worldlink-hotspot-logo.png' %}" alt="WorldLink Hotspot">
       <img class="whc-lockup-dark" src="{% static 'img/worldlink-hotspot-logo-dark.png' %}" alt="WorldLink Hotspot">
+      {% endif %}
     </span>
     <span class="whc-brand-company">{{ platform_brand.name|default:'WORLDLINK SECURITY SYSTEMS' }}</span>
   </a>
   {% block auth_content %}{% endblock %}
 </section>
+</div>
 <footer class="auth-foot">
   <span class="auth-foot-company">© 2026 {{ platform_brand.name|default:'WORLDLINK SECURITY SYSTEMS' }}</span>
   <span class="auth-foot-tagline">{{ platform_brand.tagline|default:'Linking Security to Every Corner!' }}</span>

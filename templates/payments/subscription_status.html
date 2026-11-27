@@ -1,5 +1,4 @@
 {% extends 'base.html' %}{% load static %}{% block content %}
-<link rel="stylesheet" href="{% static 'css/subscription_v2.css' %}?v={{ app_css_version }}">
 <div class="page-heading"><div><p class="eyebrow">WORLDLINK · {% if ui_lang == 'sw' %}MALIPO{% else %}PAYMENT{% endif %}</p><h1>{% if ui_lang == 'sw' %}Hali ya malipo ya usajili{% else %}Subscription payment status{% endif %}</h1></div></div>
 <section class="panel wlsub-status-page{% if payment.applied_at or payment.status == 'FAILED' or payment.status == 'REFUNDED' or payment.status == 'REVERSED' %} is-done{% endif %}">
   <div class="wlsub-wait-icon"><span class="wlsub-spinner" aria-hidden="true"></span></div>
